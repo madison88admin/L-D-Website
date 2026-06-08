@@ -1,11 +1,9 @@
 import type { ChangeEvent, FormEvent } from 'react';
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
 import {
   programs,
   type Program,
   type ProgramDetailContent,
-  type ProgramTextAlign,
 } from '../data/programs';
 
 const programsStorageKey = 'madison88-program-content';
@@ -181,26 +179,6 @@ function Programs() {
     );
   };
 
-  const updateProgramDetail = (
-    slug: string,
-    field: keyof ProgramDetailContent,
-    value: string | boolean,
-  ) => {
-    setDraftProgramContent((content) =>
-      content.map((program) =>
-        program.slug === slug
-          ? {
-              ...program,
-              detail: {
-                ...program.detail,
-                [field]: value,
-              },
-            }
-          : program,
-      ),
-    );
-  };
-
   const addProgram = () => {
     setDraftProgramContent((content) => {
       const title = 'New Program';
@@ -278,24 +256,42 @@ function Programs() {
       </div>
 
       <div className="programs-card-grid">
-        {programContent.map((program) => (
-          <Link className="program-image-card" key={program.slug} to={`/programs/${program.slug}`}>
-            {program.image && (
-              <img
-                key={program.image}
-                src={program.image}
-                alt={program.title}
-                onLoad={(event) => {
-                  event.currentTarget.style.display = 'block';
-                }}
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none';
-                }}
-              />
-            )}
-            <span>{program.title}</span>
-          </Link>
-        ))}
+        {programContent.map((program) => {
+          const cardInner = (
+            <>
+              {program.image && (
+                <img
+                  key={program.image}
+                  src={program.image}
+                  alt={program.title}
+                  onLoad={(event) => {
+                    event.currentTarget.style.display = 'block';
+                  }}
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+              <span>{program.title}</span>
+            </>
+          );
+
+          return program.link ? (
+            <a
+              className="program-image-card"
+              key={program.slug}
+              href={program.link}
+              target="_blank"
+              rel="noopener noreferrer"
+            >
+              {cardInner}
+            </a>
+          ) : (
+            <article className="program-image-card" key={program.slug}>
+              {cardInner}
+            </article>
+          );
+        })}
       </div>
 
       {isAdminOpen && (
@@ -408,6 +404,28 @@ function Programs() {
                             }}
                           />
                         </label>
+                        <label className="program-admin-summary-field">
+                          Highlight Description
+                          <textarea
+                            maxLength={160}
+                            value={program.summary}
+                            placeholder="Short description shown on the home page highlight card."
+                            onChange={(event) => {
+                              updateProgram(program.slug, 'summary', event.target.value);
+                            }}
+                          />
+                        </label>
+                        <label className="program-admin-summary-field">
+                          Card Link
+                          <input
+                            type="url"
+                            value={program.link ?? ''}
+                            placeholder="https://example.com — opens when the card is clicked"
+                            onChange={(event) => {
+                              updateProgram(program.slug, 'link', event.target.value);
+                            }}
+                          />
+                        </label>
                         <button
                           className="program-admin-danger"
                           type="button"
@@ -418,146 +436,6 @@ function Programs() {
                           Delete Card
                         </button>
                       </div>
-
-                      <details className="program-admin-detail-dropdown">
-                        <summary>Paragraph Page Editor</summary>
-                        <div className="program-admin-editor-toolbar" aria-label="Text controls">
-                          <label>
-                            Size
-                            <input
-                              value={program.detail.textSize}
-                              placeholder="2rem"
-                              onChange={(event) => {
-                                updateProgramDetail(program.slug, 'textSize', event.target.value);
-                              }}
-                            />
-                          </label>
-                          <label>
-                            Alignment
-                            <select
-                              value={program.detail.alignment}
-                              onChange={(event) => {
-                                updateProgramDetail(
-                                  program.slug,
-                                  'alignment',
-                                  event.target.value as ProgramTextAlign,
-                                );
-                              }}
-                            >
-                              <option value="left">Left</option>
-                              <option value="center">Center</option>
-                              <option value="right">Right</option>
-                              <option value="justify">Justify</option>
-                            </select>
-                          </label>
-                          <label>
-                            Color
-                            <input
-                              type="color"
-                              value={program.detail.textColor}
-                              onChange={(event) => {
-                                updateProgramDetail(program.slug, 'textColor', event.target.value);
-                              }}
-                            />
-                          </label>
-                          <label className="program-admin-check">
-                            <input
-                              type="checkbox"
-                              checked={program.detail.isBold}
-                              onChange={(event) => {
-                                updateProgramDetail(program.slug, 'isBold', event.target.checked);
-                              }}
-                            />
-                            Bold
-                          </label>
-                          <label className="program-admin-check">
-                            <input
-                              type="checkbox"
-                              checked={program.detail.isIndented}
-                              onChange={(event) => {
-                                updateProgramDetail(
-                                  program.slug,
-                                  'isIndented',
-                                  event.target.checked,
-                                );
-                              }}
-                            />
-                            Indent
-                          </label>
-                          <label className="program-admin-check">
-                            <input
-                              type="checkbox"
-                              checked={program.detail.useDetail}
-                              onChange={(event) => {
-                                updateProgramDetail(
-                                  program.slug,
-                                  'useDetail',
-                                  event.target.checked,
-                                );
-                              }}
-                            />
-                            Use
-                          </label>
-                        </div>
-
-                        <div className="program-detail-admin-grid">
-                          <label>
-                            Heading
-                            <input
-                              maxLength={80}
-                              value={program.detail.heading}
-                              onChange={(event) => {
-                                updateProgramDetail(program.slug, 'heading', event.target.value);
-                              }}
-                            />
-                          </label>
-                          <label>
-                            Subheading
-                            <input
-                              maxLength={80}
-                              value={program.detail.subheading}
-                              onChange={(event) => {
-                                updateProgramDetail(
-                                  program.slug,
-                                  'subheading',
-                                  event.target.value,
-                                );
-                              }}
-                            />
-                          </label>
-                          <label>
-                            Title
-                            <input
-                              maxLength={80}
-                              value={program.detail.title}
-                              onChange={(event) => {
-                                updateProgramDetail(program.slug, 'title', event.target.value);
-                              }}
-                            />
-                          </label>
-                          <label>
-                            Subtitle
-                            <input
-                              maxLength={120}
-                              value={program.detail.subtitle}
-                              onChange={(event) => {
-                                updateProgramDetail(program.slug, 'subtitle', event.target.value);
-                              }}
-                            />
-                          </label>
-                        </div>
-
-                        <label>
-                          Text Box
-                          <textarea
-                            className="program-admin-textbox"
-                            value={program.detail.text}
-                            onChange={(event) => {
-                              updateProgramDetail(program.slug, 'text', event.target.value);
-                            }}
-                          />
-                        </label>
-                      </details>
                     </div>
                   ))}
                 </section>

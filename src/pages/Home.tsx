@@ -1,7 +1,29 @@
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { programs } from '../data/programs';
+import { programs, type Program } from '../data/programs';
+
+const programsStorageKey = 'madison88-program-content';
+
+function loadPrograms(): Program[] {
+  if (typeof window === 'undefined') return programs;
+  try {
+    const saved = window.localStorage.getItem(programsStorageKey);
+    if (!saved) return programs;
+    const parsed = JSON.parse(saved) as Program[];
+    const savedSlugs = new Set(parsed.map((p) => p.slug));
+    const merged = programs
+      .filter((p) => savedSlugs.has(p.slug))
+      .map((p) => {
+        const saved = parsed.find((s) => s.slug === p.slug);
+        return { ...p, ...saved, detail: { ...p.detail, ...saved?.detail } };
+      });
+    const added = parsed.filter((s) => !programs.some((p) => p.slug === s.slug));
+    return [...merged, ...added];
+  } catch {
+    return programs;
+  }
+}
 
 type ProgramPreviewStyle = CSSProperties & {
   '--program-accent': string;
@@ -29,8 +51,26 @@ type TeamContent = {
 };
 
 const teamStorageKey = 'madison88-team-content';
+const featuredStorageKey = 'madison88-featured-programs';
 const hrAdminUsername = 'hr-admin';
 const hrAdminPassword = 'change-this-password';
+const MAX_FEATURED = 4;
+
+function loadFeaturedSlugs(allPrograms: typeof programs): string[] {
+  if (typeof window === 'undefined') return allPrograms.slice(0, MAX_FEATURED).map((p) => p.slug);
+  try {
+    const saved = window.localStorage.getItem(featuredStorageKey);
+    if (saved) {
+      const parsed = JSON.parse(saved) as string[];
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed.slice(0, MAX_FEATURED);
+    }
+  } catch { /* fall through */ }
+  return allPrograms.slice(0, MAX_FEATURED).map((p) => p.slug);
+}
+
+function saveFeaturedSlugs(slugs: string[]) {
+  window.localStorage.setItem(featuredStorageKey, JSON.stringify(slugs));
+}
 const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,
@@ -182,7 +222,10 @@ function getBlankMember(): TeamMember {
 }
  
 function Home() {
-  const programHighlights = programs.slice(0, 4);
+  const [allPrograms] = useState(loadPrograms);
+  const [featuredSlugs, setFeaturedSlugs] = useState(() => loadFeaturedSlugs(programs));
+  const [draftFeaturedSlugs, setDraftFeaturedSlugs] = useState(featuredSlugs);
+  const [isFeaturedAdminOpen, setIsFeaturedAdminOpen] = useState(false);
   const [teamContent, setTeamContent] = useState(loadTeamContent);
   const [draftTeamContent, setDraftTeamContent] = useState(teamContent);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -190,6 +233,29 @@ function Home() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+
+  const programHighlights = allPrograms
+    .filter((p) => featuredSlugs.includes(p.slug))
+    .sort((a, b) => featuredSlugs.indexOf(a.slug) - featuredSlugs.indexOf(b.slug));
+
+  const openFeaturedAdmin = () => {
+    setDraftFeaturedSlugs(featuredSlugs);
+    setIsFeaturedAdminOpen(true);
+  };
+
+  const toggleFeatured = (slug: string) => {
+    setDraftFeaturedSlugs((prev) => {
+      if (prev.includes(slug)) return prev.filter((s) => s !== slug);
+      if (prev.length >= MAX_FEATURED) return prev;
+      return [...prev, slug];
+    });
+  };
+
+  const saveFeatured = () => {
+    saveFeaturedSlugs(draftFeaturedSlugs);
+    setFeaturedSlugs(draftFeaturedSlugs);
+    setIsFeaturedAdminOpen(false);
+  };
 
   const openHrEditor = () => {
     setDraftTeamContent(teamContent);
@@ -351,7 +417,14 @@ function Home() {
       <section className="home-program-section">
         <div className="section-inner home-program-content">
           <div className="home-program-heading">
-            <h2>Explore learning programs.</h2>
+            <h2
+              onClick={(event) => {
+                if (event.detail === 3) openFeaturedAdmin();
+              }}
+              style={{ cursor: 'default', userSelect: 'none' }}
+            >
+              Explore learning programs.
+            </h2>
             <p>
               Discover focused programs for communication, leadership,
               technology, service, productivity, and more.
@@ -366,7 +439,16 @@ function Home() {
                 style={{ '--program-accent': program.accent } as ProgramPreviewStyle}
               >
                 <div className="home-program-preview-image">
-                  <span>{program.title.charAt(0)}</span>
+                  {program.image ? (
+                    <img
+                      src={program.image}
+                      alt={program.title}
+                      className="home-program-preview-img"
+                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                    />
+                  ) : (
+                    <span>{program.title.charAt(0)}</span>
+                  )}
                 </div>
                 <div className="home-program-preview-copy">
                   <h3>{program.title}</h3>
@@ -475,6 +557,91 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {isFeaturedAdminOpen && (
+        <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="Featured programs editor">
+          <div className="hr-admin-modal">
+            <div className="hr-admin-header">
+              <div>
+                <p className="section-kicker">Home Admin</p>
+                <h2>{isHrLoggedIn ? 'Choose Featured Programs' : 'Admin Login'}</h2>
+              </div>
+              <button
+                className="hr-admin-close"
+                type="button"
+                onClick={() => {
+                  setIsFeaturedAdminOpen(false);
+                  setLoginError('');
+                }}
+                aria-label="Close featured programs admin"
+              >
+                x
+              </button>
+            </div>
+
+            {!isHrLoggedIn ? (
+              <form className="hr-admin-login" onSubmit={handleAdminLogin}>
+                <label>
+                  Username
+                  <input
+                    value={loginForm.username}
+                    onChange={(event) => setLoginForm((f) => ({ ...f, username: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(event) => setLoginForm((f) => ({ ...f, password: event.target.value }))}
+                  />
+                </label>
+                {loginError && <p className="hr-admin-error">{loginError}</p>}
+                <button className="hr-admin-primary" type="submit">Login</button>
+              </form>
+            ) : (
+              <div className="hr-admin-editor">
+                <section className="hr-admin-editor-section">
+                  <p style={{ marginBottom: '12px', color: '#52687b', fontSize: '0.92rem' }}>
+                    Select up to {MAX_FEATURED} programs to feature on the home page.
+                    ({draftFeaturedSlugs.length}/{MAX_FEATURED} selected)
+                  </p>
+                  <div className="featured-program-picker">
+                    {programs.map((program) => {
+                      const isSelected = draftFeaturedSlugs.includes(program.slug);
+                      const isDisabled = !isSelected && draftFeaturedSlugs.length >= MAX_FEATURED;
+                      return (
+                        <label
+                          key={program.slug}
+                          className={`featured-program-option${isSelected ? ' featured-selected' : ''}${isDisabled ? ' featured-disabled' : ''}`}
+                          style={{ '--program-accent': program.accent } as ProgramPreviewStyle}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isSelected}
+                            disabled={isDisabled}
+                            onChange={() => toggleFeatured(program.slug)}
+                          />
+                          <span className="featured-program-dot" />
+                          <span className="featured-program-name">{program.title}</span>
+                        </label>
+                      );
+                    })}
+                  </div>
+                </section>
+                <div className="hr-admin-actions">
+                  <button type="button" onClick={() => { setDraftFeaturedSlugs(featuredSlugs); setIsFeaturedAdminOpen(false); }}>
+                    Cancel
+                  </button>
+                  <button className="hr-admin-primary" type="button" onClick={saveFeatured}>
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isAdminOpen && (
         <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="HR team editor">

@@ -305,10 +305,10 @@ function AboutUs() {
           <div className="about-copy">
             <h2>We are Madison 88.</h2>
             <p>
-              Madison88 Learning & Development helps professionals and teams
-              build practical skills for modern work. Through focused programs,
-              thoughtful facilitation, and a commitment to measurable growth, we
-              support learners as they upskill, excel, and succeed.
+              A privately held outdoor accessories company with a primary office
+              location in Denver, CO. We are a world-class design, development and
+              manufacturing company that can help reimagine what your assortments
+              can be.
             </p>
           </div>
         </div>
@@ -318,9 +318,15 @@ function AboutUs() {
         <div className="section-inner excellence-content">
           <h2>Madison 88 Center for Excellence</h2>
           <p>
-            Our mission is to create learning experiences that sharpen
-            capability, strengthen confidence, and prepare individuals and
-            organizations for sustained success.
+            At Madison 88 Center for Excellence, our mission is to empower
+            employees with the skills and mindset needed to thrive in an
+            ever-evolving business landscape. We aim to <strong>upskill</strong>{' '}
+            and <strong>future-proof our workforce</strong>, fostering innovation
+            and adaptability not only within the industries we serve but also in
+            each individual's personal career journey. Through continuous
+            learning, cutting-edge training, and a culture of growth, we prepare
+            our people to lead with confidence, embrace change, and unlock their
+            full potential.
           </p>
         </div>
       </section>
