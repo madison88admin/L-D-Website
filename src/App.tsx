@@ -7,9 +7,10 @@ import AboutUs from './pages/AboutUs';
 function App() {
   const location = useLocation();
   const isHome = location.pathname === '/';
+  const isAbout = location.pathname === '/about-us';
 
   return (
-    <div className={isHome ? 'app-shell home-shell' : 'app-shell'}>
+    <div className={`app-shell${isHome ? ' home-shell' : ''}${isAbout ? ' flush-shell' : ''}`}>
       <header className="site-header">
         <NavLink className="brand" to="/" aria-label="Madison88 Learning & Development Website home">
           Global HR &amp; Admin

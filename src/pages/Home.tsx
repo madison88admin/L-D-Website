@@ -17,7 +17,7 @@ const contributors = [
   { name: 'Eric', role: 'Manuf. & QA', initials: 'ER' },
   { name: 'CA', role: 'Administration', initials: 'CA' },
 ];
-
+ 
 function Home() {
   return (
     <div className="home-page">
@@ -50,14 +50,6 @@ function Home() {
 
       <section className="home-about">
         <div className="section-inner about-grid">
-          <img
-            className="section-logo"
-            src="/images/madison88-logo-blue.png"
-            alt="Madison88"
-            onError={(event) => {
-              event.currentTarget.style.display = 'none';
-            }}
-          />
 
           <div className="about-image-card" aria-label="Madison88 learning session"></div>
 

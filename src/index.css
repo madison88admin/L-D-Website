@@ -110,7 +110,8 @@ a {
   padding: clamp(48px, 8vw, 88px) clamp(20px, 5vw, 72px);
 }
 
-.home-shell .site-main {
+.home-shell .site-main,
+.flush-shell .site-main {
   padding: 0;
 }
 
