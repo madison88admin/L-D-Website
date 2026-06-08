@@ -8,9 +8,10 @@ function App() {
   const location = useLocation();
   const isHome = location.pathname === '/';
   const isAbout = location.pathname === '/about-us';
+  const isPrograms = location.pathname.startsWith('/programs');
 
   return (
-    <div className={`app-shell${isHome ? ' home-shell' : ''}${isAbout ? ' flush-shell' : ''}`}>
+    <div className={`app-shell${isHome ? ' home-shell' : ''}${isAbout || isPrograms ? ' flush-shell' : ''}`}>
       <header className="site-header">
         <NavLink className="brand" to="/" aria-label="Madison88 Learning & Development Website home">
           Global HR &amp; Admin
