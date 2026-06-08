@@ -8,6 +8,7 @@ type ProgramPreviewStyle = CSSProperties & {
 };
 
 type TeamMember = {
+  title?: string;
   name: string;
   role: string;
   initials: string;
@@ -15,6 +16,10 @@ type TeamMember = {
 };
 
 type TeamContent = {
+  heading: {
+    title: string;
+    description: string;
+  };
   specialist: TeamMember & {
     bio: string;
   };
@@ -29,13 +34,22 @@ const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,
   specialistBio: 180,
+  headingTitle: 70,
+  headingDescription: 180,
+  memberTitle: 40,
   memberName: 45,
   memberRole: 80,
   initials: 4,
 };
 
 const defaultTeamContent: TeamContent = {
+  heading: {
+    title: 'L&D Specialist Profile',
+    description:
+      'A cross-functional learning group supporting programs, operations, systems, and team capability across Madison88.',
+  },
   specialist: {
+    title: 'L&D Specialist',
     name: 'Arabelle Shanley Leano',
     role: 'HR & Admin Associate, Learning & Development Specialist',
     initials: 'AS',
@@ -77,6 +91,15 @@ const defaultTeamContent: TeamContent = {
     { name: 'Cris Ascano', role: 'Administration', initials: 'CA', image: '' },
   ],
 };
+
+const specialistIntroduction =
+  'I am Arabelle Shanley T. Leaño, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.';
+
+const specialistQuote =
+  '“Live as if you were to die tomorrow. Learn as if you were to live forever.” — Mahatma Gandhi';
+
+const specialistMantra =
+  '“It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best.”';
 
 function loadTeamContent() {
   if (typeof window === 'undefined') {
@@ -147,6 +170,7 @@ function resizeImageForStorage(file: File) {
 
 function getBlankMember(): TeamMember {
   return {
+    title: 'Team Member',
     name: 'New Member',
     role: 'Role',
     initials: 'NM',
@@ -197,6 +221,17 @@ function Home() {
       ...content,
       specialist: {
         ...content.specialist,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateSectionHeading = (field: keyof NonNullable<TeamContent['heading']>, value: string) => {
+    setDraftTeamContent((content) => ({
+      ...content,
+      heading: {
+        title: content.heading?.title || defaultTeamContent.heading.title,
+        description: content.heading?.description || defaultTeamContent.heading.description,
         [field]: value,
       },
     }));
@@ -355,12 +390,8 @@ function Home() {
               }
             }}
           >
-            <p className="section-kicker">Specialist Profile</p>
-            <h2>L&amp;D Specialist Profile</h2>
-            <p>
-              A cross-functional learning group supporting programs, operations,
-              systems, and team capability across Madison88.
-            </p>
+            <h2>{teamContent.heading?.title || defaultTeamContent.heading.title}</h2>
+            <p>{teamContent.heading?.description || defaultTeamContent.heading.description}</p>
           </div>
 
           <div className="profile-layout">
@@ -372,12 +403,30 @@ function Home() {
                 }
               }}
             >
-              <div className="specialist-photo profile-photo">
-                {renderMemberPhoto(teamContent.specialist)}
+              <div className="profile-card-header">
+                <div className="specialist-photo profile-photo">
+                  {renderMemberPhoto(teamContent.specialist)}
+                </div>
+                <div className="profile-card-intro">
+                  <p className="profile-title">
+                    {teamContent.specialist.title || 'L&D Specialist'}
+                  </p>
+                  <h3>{teamContent.specialist.name}</h3>
+                  <p className="profile-role">{teamContent.specialist.role}</p>
+                </div>
               </div>
-              <p className="profile-role">{teamContent.specialist.role}</p>
-              <h3>{teamContent.specialist.name}</h3>
-              <p>{teamContent.specialist.bio}</p>
+              <div className="profile-story">
+                <div>
+                  <p>{specialistIntroduction}</p>
+                </div>
+                <div>
+                  <p>{specialistQuote}</p>
+                </div>
+                <div>
+                  <p>{specialistMantra}</p>
+                </div>
+              </div>
+              <br></br>
               <a className="profile-contact" href="mailto:?subject=Learning%20%26%20Development%20Inquiry">
                 Contact Me
               </a>
@@ -392,7 +441,8 @@ function Home() {
                     <div className="contributor-photo">
                       {renderMemberPhoto(member)}
                     </div>
-                    <div>
+                    <div className="contributor-details">
+                      <p className="member-profile-title">{member.title || 'HR Member'}</p>
                       <h4>{member.name}</h4>
                       <p>{member.role}</p>
                     </div>
@@ -410,7 +460,8 @@ function Home() {
                     <div className="contributor-photo">
                       {renderMemberPhoto(contributor)}
                     </div>
-                    <div>
+                    <div className="contributor-details">
+                      <p className="member-profile-title">{contributor.title || 'Contributor'}</p>
                       <h4>{contributor.name}</h4>
                       <p>{contributor.role}</p>
                     </div>
@@ -473,8 +524,47 @@ function Home() {
             ) : (
               <div className="hr-admin-editor">
                 <section className="hr-admin-editor-section">
+                  <h3>Section Header</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Heading
+                      <input
+                        maxLength={teamFieldLimits.headingTitle}
+                        value={draftTeamContent.heading?.title || defaultTeamContent.heading.title}
+                        onChange={(event) => {
+                          updateSectionHeading('title', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Description
+                      <textarea
+                        maxLength={teamFieldLimits.headingDescription}
+                        value={
+                          draftTeamContent.heading?.description ||
+                          defaultTeamContent.heading.description
+                        }
+                        onChange={(event) => {
+                          updateSectionHeading('description', event.target.value);
+                        }}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="hr-admin-editor-section">
                   <h3>L&amp;D Specialist</h3>
                   <div className="hr-admin-grid">
+                    <label>
+                      Title
+                      <input
+                        maxLength={teamFieldLimits.memberTitle}
+                        value={draftTeamContent.specialist.title || 'L&D Specialist'}
+                        onChange={(event) => {
+                          updateSpecialist('title', event.target.value);
+                        }}
+                      />
+                    </label>
                     <label>
                       Name
                       <input
@@ -579,6 +669,14 @@ function Home() {
                         </label>
                       </div>
                       <input
+                        aria-label="HR member title"
+                        maxLength={teamFieldLimits.memberTitle}
+                        value={member.title || 'HR Member'}
+                        onChange={(event) => {
+                          updateTeamMember('hrMembers', index, 'title', event.target.value);
+                        }}
+                      />
+                      <input
                         aria-label="HR member name"
                         maxLength={teamFieldLimits.memberName}
                         value={member.name}
@@ -653,6 +751,14 @@ function Home() {
                           Choose File
                         </label>
                       </div>
+                      <input
+                        aria-label="Contributor title"
+                        maxLength={teamFieldLimits.memberTitle}
+                        value={member.title || 'Contributor'}
+                        onChange={(event) => {
+                          updateTeamMember('contributors', index, 'title', event.target.value);
+                        }}
+                      />
                       <input
                         aria-label="Contributor name"
                         maxLength={teamFieldLimits.memberName}
