@@ -969,6 +969,7 @@ a {
   gap: 14px;
 }
 
+.hr-admin-member-header,
 .hr-admin-member-row {
   display: grid;
   grid-template-columns:
@@ -976,10 +977,20 @@ a {
     minmax(120px, 0.8fr)
     minmax(150px, 1fr)
     minmax(180px, 1.35fr)
-    minmax(76px, 0.42fr)
     auto;
   align-items: center;
   gap: 12px;
+}
+
+.hr-admin-member-header {
+  margin-top: 2px;
+  padding: 0 8px;
+  color: #173c63;
+  font-size: 0.74rem;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.2;
+  text-transform: uppercase;
 }
 
 .hr-admin-upload {
@@ -1465,8 +1476,13 @@ a {
   }
 
   .hr-admin-grid,
+  .hr-admin-member-header,
   .hr-admin-member-row {
     grid-template-columns: 1fr;
+  }
+
+  .hr-admin-member-header {
+    display: none;
   }
 
   .hr-admin-upload,

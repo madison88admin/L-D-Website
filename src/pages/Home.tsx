@@ -22,6 +22,7 @@ type TeamContent = {
   };
   specialist: TeamMember & {
     bio: string;
+    email?: string;
   };
   hrMembers: TeamMember[];
   contributors: TeamMember[];
@@ -34,6 +35,7 @@ const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,
   specialistBio: 180,
+  specialistEmail: 80,
   headingTitle: 70,
   headingDescription: 180,
   memberTitle: 40,
@@ -54,6 +56,7 @@ const defaultTeamContent: TeamContent = {
     role: 'HR & Admin Associate, Learning & Development Specialist',
     initials: 'AS',
     image: '/images/team/arabelle-shanley-leano.png',
+    email: 'arabelle.leano@madison88.com',
     bio:
       'Leads learning coordination, program support, and development initiatives for the Global HR & Admin group.',
   },
@@ -427,14 +430,16 @@ function Home() {
                 </div>
               </div>
               <br></br>
-              <a className="profile-contact" href="mailto:?subject=Learning%20%26%20Development%20Inquiry">
+              <a
+                className="profile-contact"
+                href={`mailto:${teamContent.specialist.email || defaultTeamContent.specialist.email}?subject=Learning%20%26%20Development%20Inquiry`}
+              >
                 Contact Me
               </a>
             </article>
 
             <article className="specialist-card hr-members-card">
               <p className="profile-role">HR Members</p>
-              <h3>HR Partners</h3>
               <div className="hr-member-list">
                 {teamContent.hrMembers.map((member) => (
                   <article className="contributor-profile" key={member.name}>
@@ -453,7 +458,6 @@ function Home() {
 
             <article className="specialist-card contributors-card">
               <p className="profile-role">Contributors</p>
-              <h3>Program Contributors</h3>
               <div className="contributors-list">
                 {teamContent.contributors.map((contributor) => (
                   <article className="contributor-profile" key={contributor.name}>
@@ -586,12 +590,15 @@ function Home() {
                       />
                     </label>
                     <label>
-                      Initials
+                      Email
                       <input
-                        maxLength={teamFieldLimits.initials}
-                        value={draftTeamContent.specialist.initials}
+                        type="email"
+                        maxLength={teamFieldLimits.specialistEmail}
+                        value={
+                          draftTeamContent.specialist.email || defaultTeamContent.specialist.email
+                        }
                         onChange={(event) => {
-                          updateSpecialist('initials', event.target.value);
+                          updateSpecialist('email', event.target.value);
                         }}
                       />
                     </label>
@@ -643,6 +650,13 @@ function Home() {
                       Add Member
                     </button>
                   </div>
+                  <div className="hr-admin-member-header" aria-hidden="true">
+                    <span>Photo</span>
+                    <span>Title</span>
+                    <span>Full Name</span>
+                    <span>Position</span>
+                    <span></span>
+                  </div>
                   {draftTeamContent.hrMembers.map((member, index) => (
                     <div className="hr-admin-member-row" key={`hr-${index}`}>
                       <div className="hr-admin-photo-editor">
@@ -692,14 +706,6 @@ function Home() {
                           updateTeamMember('hrMembers', index, 'role', event.target.value);
                         }}
                       />
-                      <input
-                        aria-label="HR member initials"
-                        maxLength={teamFieldLimits.initials}
-                        value={member.initials}
-                        onChange={(event) => {
-                          updateTeamMember('hrMembers', index, 'initials', event.target.value);
-                        }}
-                      />
                       <button
                         className="hr-admin-delete"
                         type="button"
@@ -725,6 +731,13 @@ function Home() {
                     >
                       Add Member
                     </button>
+                  </div>
+                  <div className="hr-admin-member-header" aria-hidden="true">
+                    <span>Photo</span>
+                    <span>Title</span>
+                    <span>Full Name</span>
+                    <span>Position</span>
+                    <span></span>
                   </div>
                   {draftTeamContent.contributors.map((member, index) => (
                     <div className="hr-admin-member-row" key={`contributor-${index}`}>
@@ -773,14 +786,6 @@ function Home() {
                         value={member.role}
                         onChange={(event) => {
                           updateTeamMember('contributors', index, 'role', event.target.value);
-                        }}
-                      />
-                      <input
-                        aria-label="Contributor initials"
-                        maxLength={teamFieldLimits.initials}
-                        value={member.initials}
-                        onChange={(event) => {
-                          updateTeamMember('contributors', index, 'initials', event.target.value);
                         }}
                       />
                       <button
