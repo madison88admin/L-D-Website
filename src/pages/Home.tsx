@@ -351,7 +351,6 @@ function Home() {
       <section className="home-program-section">
         <div className="section-inner home-program-content">
           <div className="home-program-heading">
-            <p className="section-kicker">Programs</p>
             <h2>Explore learning programs.</h2>
             <p>
               Discover focused programs for communication, leadership,
