@@ -19,14 +19,7 @@ function AboutUs() {
 
       <section className="excellence-section">
         <div className="section-inner excellence-content">
-          <img
-            className="excellence-logo"
-            src="/images/madison88-logo-yellow.png"
-            alt="Madison88"
-            onError={(event) => {
-              event.currentTarget.style.display = 'none';
-            }}
-          />
+          
           <h2>Madison 88 Center for Excellence</h2>
           <p>
             Our mission is to create learning experiences that sharpen
