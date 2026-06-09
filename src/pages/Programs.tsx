@@ -8,7 +8,7 @@ import {
 
 const programsStorageKey = 'madison88-program-content';
 const adminUsername = 'hr-admin';
-const adminPassword = 'change-this-password';
+const adminPassword = 'Madison88HR!2026';
 
 function loadPrograms() {
   if (typeof window === 'undefined') {

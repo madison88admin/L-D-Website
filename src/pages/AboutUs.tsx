@@ -24,7 +24,7 @@ type TeamContent = {
 
 const teamStorageKey = 'madison88-team-content';
 const hrAdminUsername = 'hr-admin';
-const hrAdminPassword = 'change-this-password';
+const hrAdminPassword = 'Madison88HR!2026';
 const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,

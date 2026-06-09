@@ -53,7 +53,7 @@ type TeamContent = {
 const teamStorageKey = 'madison88-team-content';
 const featuredStorageKey = 'madison88-featured-programs';
 const hrAdminUsername = 'hr-admin';
-const hrAdminPassword = 'change-this-password';
+const hrAdminPassword = 'Madison88HR!2026';
 const MAX_FEATURED = 4;
 
 function loadFeaturedSlugs(allPrograms: typeof programs): string[] {
