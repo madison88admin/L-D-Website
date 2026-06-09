@@ -386,3 +386,41 @@ export const programs: Program[] = [
 export function getProgramBySlug(slug: string | undefined) {
   return programs.find((program) => program.slug === slug);
 }
+
+export function getLinkThumbnail(link: string | undefined) {
+  if (!link) return '';
+
+  try {
+    const url = new URL(link);
+    const directImagePattern = /\.(apng|avif|gif|jpe?g|png|svg|webp)$/i;
+
+    if (directImagePattern.test(url.pathname)) {
+      return link;
+    }
+
+    const youtubeMatch =
+      url.hostname.includes('youtu.be')
+        ? url.pathname.split('/').filter(Boolean)[0]
+        : url.searchParams.get('v');
+
+    if (youtubeMatch && (url.hostname.includes('youtube.com') || url.hostname.includes('youtu.be'))) {
+      return `https://img.youtube.com/vi/${youtubeMatch}/hqdefault.jpg`;
+    }
+
+    const driveMatch =
+      url.hostname.includes('drive.google.com') &&
+      (url.pathname.match(/\/file\/d\/([^/]+)/)?.[1] || url.searchParams.get('id'));
+
+    if (driveMatch) {
+      return `https://drive.google.com/thumbnail?id=${driveMatch}&sz=w800`;
+    }
+
+    return `https://www.google.com/s2/favicons?sz=256&domain_url=${encodeURIComponent(url.origin)}`;
+  } catch {
+    return '';
+  }
+}
+
+export function getProgramThumbnail(program: Pick<Program, 'image' | 'link'>) {
+  return program.image || getLinkThumbnail(program.link);
+}
