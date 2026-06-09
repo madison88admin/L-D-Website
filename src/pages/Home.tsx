@@ -1,7 +1,7 @@
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { programs, type Program } from '../data/programs';
+import { getLinkThumbnail, getProgramThumbnail, programs, type Program } from '../data/programs';
 
 const programsStorageKey = 'madison88-program-content';
 
@@ -50,8 +50,39 @@ type TeamContent = {
   contributors: TeamMember[];
 };
 
+type FeaturedCourseCard = {
+  title: string;
+  subtitle: string;
+  description: string;
+  link: string;
+  image: string;
+  column: 'copilot' | 'outlook';
+};
+
+type FeaturedCoursesContent = {
+  kicker: string;
+  leftTitle: string;
+  centerText: string;
+  rightLineOne: string;
+  rightLineTwo: string;
+  phaseKicker: string;
+  phaseTitle: string;
+  cards: FeaturedCourseCard[];
+};
+
+type HomeHeroContent = {
+  logo: string;
+  backgroundVideo: string;
+  titleLineOne: string;
+  titleLineTwo: string;
+  titleLineThree: string;
+  tagline: string;
+};
+
 const teamStorageKey = 'madison88-team-content';
 const featuredStorageKey = 'madison88-featured-programs';
+const featuredCoursesStorageKey = 'madison88-featured-courses-content';
+const homeHeroStorageKey = 'madison88-home-hero-content';
 const hrAdminUsername = 'hr-admin';
 const hrAdminPassword = 'change-this-password';
 const MAX_FEATURED = 4;
@@ -135,6 +166,67 @@ const defaultTeamContent: TeamContent = {
   ],
 };
 
+const defaultFeaturedCoursesContent: FeaturedCoursesContent = {
+  kicker: 'Featured Courses',
+  leftTitle: 'Copilot',
+  centerText: '+',
+  rightLineOne: 'Microsoft Outlook',
+  rightLineTwo: 'Email Management',
+  phaseKicker: 'PHASE I',
+  phaseTitle: 'Required Courses',
+  cards: [
+    {
+      title: 'Inbox Organization',
+      subtitle: '',
+      description: 'Apply folders, categories, flags, and search to keep work visible.',
+      link: '',
+      image: '',
+      column: 'outlook',
+    },
+    {
+      title: 'Email Triage with Copilot',
+      subtitle: '',
+      description: 'Summarize long threads and identify priority actions faster.',
+      link: '',
+      image: '',
+      column: 'copilot',
+    },
+    {
+      title: 'Rules and Automation',
+      subtitle: '',
+      description: 'Create smart rules that route recurring messages and reduce clutter.',
+      link: '',
+      image: '',
+      column: 'outlook',
+    },
+    {
+      title: 'Drafting Clear Replies',
+      subtitle: '',
+      description: 'Use Copilot prompts to create polished, audience-ready responses.',
+      link: '',
+      image: '',
+      column: 'copilot',
+    },
+    {
+      title: 'Calendar Email Workflow',
+      subtitle: '',
+      description: 'Connect email decisions to meetings, tasks, and timely follow-through.',
+      link: '',
+      image: '',
+      column: 'outlook',
+    },
+  ],
+};
+
+const defaultHomeHeroContent: HomeHeroContent = {
+  logo: '/images/madison88-logo-yellow.png',
+  backgroundVideo: '/videos/hero-background.mp4',
+  titleLineOne: 'Learning &',
+  titleLineTwo: 'Organizational',
+  titleLineThree: 'Development',
+  tagline: 'Upskill. Excel. Succeed.',
+};
+
 const specialistIntroduction =
   'I am Arabelle Shanley T. Leaño, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.';
 
@@ -164,6 +256,70 @@ function loadTeamContent() {
 
 function saveTeamContent(content: TeamContent) {
   window.localStorage.setItem(teamStorageKey, JSON.stringify(content));
+}
+
+function loadFeaturedCoursesContent() {
+  if (typeof window === 'undefined') {
+    return defaultFeaturedCoursesContent;
+  }
+
+  const savedContent = window.localStorage.getItem(featuredCoursesStorageKey);
+
+  if (!savedContent) {
+    return defaultFeaturedCoursesContent;
+  }
+
+  try {
+    const parsed = JSON.parse(savedContent) as Partial<
+      Omit<FeaturedCoursesContent, 'cards'> & {
+        cards: Array<Partial<FeaturedCourseCard> & { theme?: FeaturedCourseCard['column'] }>;
+      }
+    >;
+    const cards = parsed.cards?.length
+      ? parsed.cards.map((card) => ({
+          title: card.title || 'Course',
+          subtitle: card.subtitle || '',
+          description: card.description || '',
+          link: card.link || '',
+          image: card.image || '',
+          column: card.column || card.theme || 'copilot',
+        }))
+      : defaultFeaturedCoursesContent.cards;
+
+    return {
+      ...defaultFeaturedCoursesContent,
+      ...parsed,
+      cards,
+    };
+  } catch {
+    return defaultFeaturedCoursesContent;
+  }
+}
+
+function saveFeaturedCoursesContent(content: FeaturedCoursesContent) {
+  window.localStorage.setItem(featuredCoursesStorageKey, JSON.stringify(content));
+}
+
+function loadHomeHeroContent() {
+  if (typeof window === 'undefined') {
+    return defaultHomeHeroContent;
+  }
+
+  const savedContent = window.localStorage.getItem(homeHeroStorageKey);
+
+  if (!savedContent) {
+    return defaultHomeHeroContent;
+  }
+
+  try {
+    return { ...defaultHomeHeroContent, ...JSON.parse(savedContent) } as HomeHeroContent;
+  } catch {
+    return defaultHomeHeroContent;
+  }
+}
+
+function saveHomeHeroContent(content: HomeHeroContent) {
+  window.localStorage.setItem(homeHeroStorageKey, JSON.stringify(content));
 }
 
 function resizeImageForStorage(file: File) {
@@ -211,6 +367,27 @@ function resizeImageForStorage(file: File) {
   });
 }
 
+function readFileForStorage(file: File) {
+  return new Promise<string>((resolve, reject) => {
+    const reader = new FileReader();
+
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') {
+        reject(new Error('Unable to read file.'));
+        return;
+      }
+
+      resolve(reader.result);
+    };
+
+    reader.onerror = () => {
+      reject(new Error('Unable to read file.'));
+    };
+
+    reader.readAsDataURL(file);
+  });
+}
+
 function getBlankMember(): TeamMember {
   return {
     title: 'Team Member',
@@ -220,12 +397,29 @@ function getBlankMember(): TeamMember {
     image: '',
   };
 }
+
+function getBlankFeaturedCourseCard(): FeaturedCourseCard {
+  return {
+    title: 'New Course',
+    subtitle: '',
+    description: 'Add a short course description.',
+    link: '',
+    image: '',
+    column: 'copilot',
+  };
+}
  
 function Home() {
+  const [homeHeroContent, setHomeHeroContent] = useState(loadHomeHeroContent);
+  const [draftHomeHeroContent, setDraftHomeHeroContent] = useState(homeHeroContent);
+  const [isHeroAdminOpen, setIsHeroAdminOpen] = useState(false);
   const [allPrograms] = useState(loadPrograms);
   const [featuredSlugs, setFeaturedSlugs] = useState(() => loadFeaturedSlugs(programs));
   const [draftFeaturedSlugs, setDraftFeaturedSlugs] = useState(featuredSlugs);
   const [isFeaturedAdminOpen, setIsFeaturedAdminOpen] = useState(false);
+  const [featuredCoursesContent, setFeaturedCoursesContent] = useState(loadFeaturedCoursesContent);
+  const [draftFeaturedCoursesContent, setDraftFeaturedCoursesContent] = useState(featuredCoursesContent);
+  const [isFeaturedCoursesAdminOpen, setIsFeaturedCoursesAdminOpen] = useState(false);
   const [teamContent, setTeamContent] = useState(loadTeamContent);
   const [draftTeamContent, setDraftTeamContent] = useState(teamContent);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -241,6 +435,16 @@ function Home() {
   const openFeaturedAdmin = () => {
     setDraftFeaturedSlugs(featuredSlugs);
     setIsFeaturedAdminOpen(true);
+  };
+
+  const openHeroEditor = () => {
+    setDraftHomeHeroContent(homeHeroContent);
+    setIsHeroAdminOpen(true);
+  };
+
+  const openFeaturedCoursesEditor = () => {
+    setDraftFeaturedCoursesContent(featuredCoursesContent);
+    setIsFeaturedCoursesAdminOpen(true);
   };
 
   const toggleFeatured = (slug: string) => {
@@ -283,6 +487,76 @@ function Home() {
     } catch {
       setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
     }
+  };
+
+  const handleFeaturedCoursesSave = () => {
+    try {
+      saveFeaturedCoursesContent(draftFeaturedCoursesContent);
+      setFeaturedCoursesContent(draftFeaturedCoursesContent);
+      setSaveError('');
+      setIsFeaturedCoursesAdminOpen(false);
+    } catch {
+      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+    }
+  };
+
+  const handleHeroSave = () => {
+    try {
+      saveHomeHeroContent(draftHomeHeroContent);
+      setHomeHeroContent(draftHomeHeroContent);
+      setSaveError('');
+      setIsHeroAdminOpen(false);
+    } catch {
+      setSaveError('Save failed. Try using smaller files.');
+    }
+  };
+
+  const updateHomeHeroContent = (field: keyof HomeHeroContent, value: string) => {
+    setDraftHomeHeroContent((content) => ({
+      ...content,
+      [field]: value,
+    }));
+  };
+
+  const updateFeaturedCoursesContent = (
+    field: keyof Omit<FeaturedCoursesContent, 'cards'>,
+    value: string,
+  ) => {
+    setDraftFeaturedCoursesContent((content) => ({
+      ...content,
+      [field]: value,
+    }));
+  };
+
+  const updateFeaturedCourseCard = (
+    index: number,
+    field: keyof FeaturedCourseCard,
+    value: string,
+  ) => {
+    setDraftFeaturedCoursesContent((content) => ({
+      ...content,
+      cards: content.cards.map((card, cardIndex) =>
+        cardIndex === index ? { ...card, [field]: value } : card,
+      ),
+    }));
+  };
+
+  const addFeaturedCourseCard = () => {
+    setDraftFeaturedCoursesContent((content) => ({
+      ...content,
+      cards: [...content.cards, getBlankFeaturedCourseCard()],
+    }));
+  };
+
+  const deleteFeaturedCourseCard = (index: number) => {
+    setDraftFeaturedCoursesContent((content) => ({
+      ...content,
+      cards: content.cards.filter((_, cardIndex) => cardIndex !== index),
+    }));
+  };
+
+  const deleteFeaturedCourseImage = (index: number) => {
+    updateFeaturedCourseCard(index, 'image', '');
   };
 
   const updateSpecialist = (field: keyof TeamContent['specialist'], value: string) => {
@@ -368,49 +642,140 @@ function Home() {
     </>
   );
 
+  const renderFeaturedCourseCard = (card: FeaturedCourseCard, index: number) => {
+    const thumbnail = card.image || getLinkThumbnail(card.link);
+    const cardContent = (
+      <>
+        {thumbnail && (
+          <span
+            className={`featured-course-image featured-course-image-${card.column}`}
+            aria-hidden="true"
+          >
+            <img
+              src={thumbnail}
+              alt=""
+              onError={(event) => {
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+          </span>
+        )}
+        <span className="featured-course-description">
+          {card.subtitle && <span className="featured-course-subtitle">{card.subtitle}</span>}
+          <h4>{card.title}</h4>
+          <p>{card.description}</p>
+        </span>
+      </>
+    );
+    const className = `featured-course-card featured-course-card-column-${card.column}${thumbnail ? '' : ' featured-course-card-no-image'}`;
+
+    if (card.link) {
+      return (
+        <a
+          className={className}
+          href={card.link}
+          target="_blank"
+          rel="noopener noreferrer"
+          aria-label={`Open ${card.title}`}
+          key={`${card.title}-${index}`}
+        >
+          {cardContent}
+        </a>
+      );
+    }
+
+    return (
+      <article className={className} key={`${card.title}-${index}`}>
+        {cardContent}
+      </article>
+    );
+  };
+
+  const handleFileUpload = async (
+    event: ChangeEvent<HTMLInputElement>,
+    updateFile: (file: string) => void,
+  ) => {
+    const file = event.target.files?.[0];
+
+    if (!file) {
+      return;
+    }
+
+    try {
+      const storedFile = await readFileForStorage(file);
+      updateFile(storedFile);
+      setSaveError('');
+    } catch {
+      setSaveError('File upload failed. Please try a different file.');
+    }
+  };
+
   return (
     <div className="home-page">
       <section className="home-hero" aria-label="Madison88 Learning and Development">
-        <video
-          className="hero-background-video"
-          src="/videos/hero-background.mp4"
-          autoPlay
-          muted
-          loop
-          playsInline
-          aria-hidden="true"
-        />
-        <div className="hero-content">
-          <img
-            className="hero-logo"
-            src="/images/madison88-logo-yellow.png"
-            alt="Madison88"
-            onError={(event) => {
-              event.currentTarget.style.display = 'none';
-            }}
+        {homeHeroContent.backgroundVideo && (
+          <video
+            className="hero-background-video"
+            src={homeHeroContent.backgroundVideo}
+            autoPlay
+            muted
+            loop
+            playsInline
+            aria-hidden="true"
           />
+        )}
+        <div
+          className="hero-content"
+          onClick={(event) => {
+            if (event.detail === 3) openHeroEditor();
+          }}
+        >
+          {homeHeroContent.logo && (
+            <img
+              className="hero-logo"
+              src={homeHeroContent.logo}
+              alt="Madison88"
+              onError={(event) => {
+                event.currentTarget.style.display = 'none';
+              }}
+            />
+          )}
           <h1>
-            Learning &amp;
-            <span>Organizational Development</span>
+            {homeHeroContent.titleLineOne}
+            {homeHeroContent.titleLineTwo && <span>{homeHeroContent.titleLineTwo}</span>}
+            {homeHeroContent.titleLineThree && <span>{homeHeroContent.titleLineThree}</span>}
           </h1>
-          <p>Upskill. Excel. Succeed.</p>
+          {homeHeroContent.tagline && <p>{homeHeroContent.tagline}</p>}
         </div>
       </section>
 
       <section className="careers-section">
-        <div className="section-inner careers-grid">
+        <div className="section-inner featured-courses-content">
           <div className="careers-copy">
-            <p className="section-kicker">Careers</p>
-            <h2>Grow your career with Madison 88.</h2>
-            <p>
-              Build the confidence, capability, and workplace habits that help
-              you move forward. Our learning experiences are designed to support
-              career growth through practical development and continuous
-              improvement.
-            </p>
+            <p className="section-kicker">{featuredCoursesContent.kicker}</p>
+            <h2
+              className="featured-courses-title"
+              onClick={(event) => {
+                if (event.detail === 3) openFeaturedCoursesEditor();
+              }}
+              style={{ cursor: 'default', userSelect: 'none' }}
+            >
+              <span>{featuredCoursesContent.leftTitle}</span>
+              <span>{featuredCoursesContent.centerText}</span>
+              <span>
+                {featuredCoursesContent.rightLineOne}
+                <span>{featuredCoursesContent.rightLineTwo}</span>
+              </span>
+            </h2>
           </div>
 
-          <div className="careers-image-card" aria-label="Career development at Madison88"></div>
+          <div className="featured-course-board">
+            <div className="featured-phase-heading">
+              <span>{featuredCoursesContent.phaseKicker}</span>
+              <h3>{featuredCoursesContent.phaseTitle}</h3>
+            </div>
+            {featuredCoursesContent.cards.map((card, index) => renderFeaturedCourseCard(card, index))}
+          </div>
         </div>
       </section>
 
@@ -432,30 +797,33 @@ function Home() {
           </div>
 
           <div className="home-program-preview-grid">
-            {programHighlights.map((program) => (
-              <article
-                className="home-program-preview-card"
-                key={program.slug}
-                style={{ '--program-accent': program.accent } as ProgramPreviewStyle}
-              >
-                <div className="home-program-preview-image">
-                  {program.image ? (
-                    <img
-                      src={program.image}
-                      alt={program.title}
-                      className="home-program-preview-img"
-                      onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                    />
-                  ) : (
-                    <span>{program.title.charAt(0)}</span>
-                  )}
-                </div>
-                <div className="home-program-preview-copy">
-                  <h3>{program.title}</h3>
-                  <p>{program.summary}</p>
-                </div>
-              </article>
-            ))}
+            {programHighlights.map((program) => {
+              const thumbnail = getProgramThumbnail(program);
+              return (
+                <article
+                  className="home-program-preview-card"
+                  key={program.slug}
+                  style={{ '--program-accent': program.accent } as ProgramPreviewStyle}
+                >
+                  <div className="home-program-preview-image">
+                    {thumbnail ? (
+                      <img
+                        src={thumbnail}
+                        alt={program.title}
+                        className="home-program-preview-img"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                      />
+                    ) : (
+                      <span>{program.title.charAt(0)}</span>
+                    )}
+                  </div>
+                  <div className="home-program-preview-copy">
+                    <h3>{program.title}</h3>
+                    <p>{program.summary}</p>
+                  </div>
+                </article>
+              );
+            })}
           </div>
 
           <Link className="home-program-link" to="/programs">
@@ -557,6 +925,428 @@ function Home() {
           </div>
         </div>
       </section>
+
+      {isHeroAdminOpen && (
+        <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="Home hero editor">
+          <div className="hr-admin-modal">
+            <div className="hr-admin-header">
+              <div>
+                <p className="section-kicker">Home Admin</p>
+                <h2>{isHrLoggedIn ? 'Edit Home Hero' : 'Admin Login'}</h2>
+              </div>
+              <button
+                className="hr-admin-close"
+                type="button"
+                onClick={() => {
+                  setIsHeroAdminOpen(false);
+                  setLoginError('');
+                  setSaveError('');
+                }}
+                aria-label="Close home hero admin"
+              >
+                x
+              </button>
+            </div>
+
+            {!isHrLoggedIn ? (
+              <form className="hr-admin-login" onSubmit={handleAdminLogin}>
+                <label>
+                  Username
+                  <input
+                    value={loginForm.username}
+                    onChange={(event) => setLoginForm((f) => ({ ...f, username: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(event) => setLoginForm((f) => ({ ...f, password: event.target.value }))}
+                  />
+                </label>
+                {loginError && <p className="hr-admin-error">{loginError}</p>}
+                <button className="hr-admin-primary" type="submit">Login</button>
+              </form>
+            ) : (
+              <div className="hr-admin-editor">
+                <section className="hr-admin-editor-section">
+                  <h3>Hero Text</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Title Line 1
+                      <input
+                        maxLength={40}
+                        value={draftHomeHeroContent.titleLineOne}
+                        onChange={(event) => updateHomeHeroContent('titleLineOne', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Title Line 2
+                      <input
+                        maxLength={40}
+                        value={draftHomeHeroContent.titleLineTwo}
+                        onChange={(event) => updateHomeHeroContent('titleLineTwo', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Title Line 3
+                      <input
+                        maxLength={40}
+                        value={draftHomeHeroContent.titleLineThree}
+                        onChange={(event) => updateHomeHeroContent('titleLineThree', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Tagline
+                      <input
+                        maxLength={80}
+                        value={draftHomeHeroContent.tagline}
+                        onChange={(event) => updateHomeHeroContent('tagline', event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <h3>Hero Media</h3>
+                  <div className="featured-course-admin-card">
+                    <div className="featured-course-admin-preview">
+                      {draftHomeHeroContent.logo ? (
+                        <img
+                          src={draftHomeHeroContent.logo}
+                          alt="Hero logo preview"
+                          onError={(event) => {
+                            event.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <span>No logo</span>
+                      )}
+                    </div>
+                    <div className="featured-course-admin-fields">
+                      <label>
+                        Logo URL
+                        <input
+                          value={draftHomeHeroContent.logo}
+                          onChange={(event) => updateHomeHeroContent('logo', event.target.value)}
+                        />
+                      </label>
+                      <div className="featured-course-admin-actions">
+                        <label>
+                          Logo Image
+                          <input
+                            id="hero-logo-upload"
+                            className="hr-admin-file-input"
+                            type="file"
+                            accept="image/*"
+                            onChange={(event) => {
+                              handleImageUpload(event, (image) => updateHomeHeroContent('logo', image));
+                            }}
+                          />
+                          <span className="hr-admin-file-button">Choose File</span>
+                        </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => updateHomeHeroContent('logo', '')}
+                        >
+                          Delete Logo
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  <label>
+                    Background Video URL
+                    <input
+                      value={draftHomeHeroContent.backgroundVideo}
+                      onChange={(event) => updateHomeHeroContent('backgroundVideo', event.target.value)}
+                    />
+                  </label>
+                  <div className="featured-course-admin-actions">
+                    <label>
+                      Background Video
+                      <input
+                        id="hero-background-video-upload"
+                        className="hr-admin-file-input"
+                        type="file"
+                        accept="video/*"
+                        onChange={(event) => {
+                          handleFileUpload(event, (file) => updateHomeHeroContent('backgroundVideo', file));
+                        }}
+                      />
+                      <span className="hr-admin-file-button">Choose File</span>
+                    </label>
+                    <button
+                      className="hr-admin-delete"
+                      type="button"
+                      onClick={() => updateHomeHeroContent('backgroundVideo', '')}
+                    >
+                      Delete Video
+                    </button>
+                  </div>
+                </section>
+
+                <div className="hr-admin-actions">
+                  {saveError && <p className="hr-admin-error">{saveError}</p>}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftHomeHeroContent(homeHeroContent);
+                      setIsHeroAdminOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button className="hr-admin-primary" type="button" onClick={handleHeroSave}>
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {isFeaturedCoursesAdminOpen && (
+        <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="Featured courses editor">
+          <div className="hr-admin-modal">
+            <div className="hr-admin-header">
+              <div>
+                <p className="section-kicker">Home Admin</p>
+                <h2>{isHrLoggedIn ? 'Edit Featured Courses' : 'Admin Login'}</h2>
+              </div>
+              <button
+                className="hr-admin-close"
+                type="button"
+                onClick={() => {
+                  setIsFeaturedCoursesAdminOpen(false);
+                  setLoginError('');
+                  setSaveError('');
+                }}
+                aria-label="Close featured courses admin"
+              >
+                x
+              </button>
+            </div>
+
+            {!isHrLoggedIn ? (
+              <form className="hr-admin-login" onSubmit={handleAdminLogin}>
+                <label>
+                  Username
+                  <input
+                    value={loginForm.username}
+                    onChange={(event) => setLoginForm((f) => ({ ...f, username: event.target.value }))}
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(event) => setLoginForm((f) => ({ ...f, password: event.target.value }))}
+                  />
+                </label>
+                {loginError && <p className="hr-admin-error">{loginError}</p>}
+                <button className="hr-admin-primary" type="submit">Login</button>
+              </form>
+            ) : (
+              <div className="hr-admin-editor">
+                <section className="hr-admin-editor-section">
+                  <h3>Section Content</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Kicker
+                      <input
+                        maxLength={40}
+                        value={draftFeaturedCoursesContent.kicker}
+                        onChange={(event) => updateFeaturedCoursesContent('kicker', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Left Title
+                      <input
+                        maxLength={40}
+                        value={draftFeaturedCoursesContent.leftTitle}
+                        onChange={(event) => updateFeaturedCoursesContent('leftTitle', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Center Text
+                      <input
+                        maxLength={4}
+                        value={draftFeaturedCoursesContent.centerText}
+                        onChange={(event) => updateFeaturedCoursesContent('centerText', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Right Title Line 1
+                      <input
+                        maxLength={60}
+                        value={draftFeaturedCoursesContent.rightLineOne}
+                        onChange={(event) => updateFeaturedCoursesContent('rightLineOne', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Right Title Line 2
+                      <input
+                        maxLength={60}
+                        value={draftFeaturedCoursesContent.rightLineTwo}
+                        onChange={(event) => updateFeaturedCoursesContent('rightLineTwo', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Phase Label
+                      <input
+                        maxLength={30}
+                        value={draftFeaturedCoursesContent.phaseKicker}
+                        onChange={(event) => updateFeaturedCoursesContent('phaseKicker', event.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Phase Title
+                      <input
+                        maxLength={70}
+                        value={draftFeaturedCoursesContent.phaseTitle}
+                        onChange={(event) => updateFeaturedCoursesContent('phaseTitle', event.target.value)}
+                      />
+                    </label>
+                  </div>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <div className="hr-admin-section-heading">
+                    <h3>Course Cards</h3>
+                    <button className="hr-admin-small-action" type="button" onClick={addFeaturedCourseCard}>
+                      Add Card
+                    </button>
+                  </div>
+                  <div className="featured-course-admin-list">
+                    {draftFeaturedCoursesContent.cards.map((card, index) => {
+                      const thumbnail = card.image || getLinkThumbnail(card.link);
+                      return (
+                        <div className="featured-course-admin-card" key={`featured-course-${index}`}>
+                          <div className="featured-course-admin-preview">
+                            {thumbnail ? (
+                              <img
+                                src={thumbnail}
+                                alt={card.title}
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            ) : (
+                              <span>No image</span>
+                            )}
+                          </div>
+
+                          <div className="featured-course-admin-fields">
+                            <div className="hr-admin-grid">
+                              <label>
+                                Title
+                                <input
+                                  maxLength={70}
+                                  value={card.title}
+                                  onChange={(event) => updateFeaturedCourseCard(index, 'title', event.target.value)}
+                                />
+                              </label>
+                              <label>
+                                Subtitle
+                                <input
+                                  maxLength={70}
+                                  value={card.subtitle}
+                                  onChange={(event) => updateFeaturedCourseCard(index, 'subtitle', event.target.value)}
+                                />
+                              </label>
+                              <label>
+                                Link
+                                <input
+                                  type="url"
+                                  value={card.link}
+                                  placeholder="https://example.com"
+                                  onChange={(event) => updateFeaturedCourseCard(index, 'link', event.target.value)}
+                                />
+                              </label>
+                              <label>
+                                Column
+                                <select
+                                  value={card.column}
+                                  onChange={(event) => updateFeaturedCourseCard(index, 'column', event.target.value)}
+                                >
+                                  <option value="copilot">Copilot column</option>
+                                  <option value="outlook">Microsoft Outlook column</option>
+                                </select>
+                              </label>
+                            </div>
+
+                            <label>
+                              Description
+                              <textarea
+                                maxLength={180}
+                                value={card.description}
+                                onChange={(event) => updateFeaturedCourseCard(index, 'description', event.target.value)}
+                              />
+                            </label>
+
+                            <div className="featured-course-admin-actions">
+                              <label>
+                                Image
+                                <input
+                                  id={`featured-course-image-${index}`}
+                                  className="hr-admin-file-input"
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(event) => {
+                                    handleImageUpload(event, (image) => {
+                                      updateFeaturedCourseCard(index, 'image', image);
+                                    });
+                                  }}
+                                />
+                                <span className="hr-admin-file-button">Choose File</span>
+                              </label>
+                              <button
+                                className="hr-admin-delete"
+                                type="button"
+                                onClick={() => deleteFeaturedCourseImage(index)}
+                              >
+                                Delete Image
+                              </button>
+                              <button
+                                className="hr-admin-delete"
+                                type="button"
+                                onClick={() => deleteFeaturedCourseCard(index)}
+                              >
+                                Delete Card
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                </section>
+
+                <div className="hr-admin-actions">
+                  {saveError && <p className="hr-admin-error">{saveError}</p>}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftFeaturedCoursesContent(featuredCoursesContent);
+                      setIsFeaturedCoursesAdminOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button className="hr-admin-primary" type="button" onClick={handleFeaturedCoursesSave}>
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isFeaturedAdminOpen && (
         <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="Featured programs editor">

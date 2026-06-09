@@ -22,6 +22,22 @@ type TeamContent = {
   contributors: TeamMember[];
 };
 
+type AboutPageContent = {
+  aboutTitle: string;
+  aboutParagraph: string;
+  aboutImage: string;
+  excellenceTitle: string;
+  excellenceParagraph: string;
+  sections: AboutPageSection[];
+};
+
+type AboutPageSection = {
+  title: string;
+  paragraph: string;
+  image: string;
+};
+
+const aboutPageStorageKey = 'madison88-about-page-content';
 const teamStorageKey = 'madison88-team-content';
 const hrAdminUsername = 'hr-admin';
 const hrAdminPassword = 'change-this-password';
@@ -88,6 +104,17 @@ const defaultTeamContent: TeamContent = {
   ],
 };
 
+const defaultAboutPageContent: AboutPageContent = {
+  aboutTitle: 'We are Madison 88.',
+  aboutParagraph:
+    'A privately held outdoor accessories company with a primary office location in Denver, CO. We are a world-class design, development and manufacturing company that can help reimagine what your assortments can be.',
+  aboutImage: '/images/about-person.png',
+  excellenceTitle: 'Madison 88 Center for Excellence',
+  excellenceParagraph:
+    "At Madison 88 Center for Excellence, our mission is to empower employees with the skills and mindset needed to thrive in an ever-evolving business landscape. We aim to upskill and future-proof our workforce, fostering innovation and adaptability not only within the industries we serve but also in each individual's personal career journey. Through continuous learning, cutting-edge training, and a culture of growth, we prepare our people to lead with confidence, embrace change, and unlock their full potential.",
+  sections: [],
+};
+
 const specialistIntroduction =
   'I am Arabelle Shanley T. Leano, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.';
 
@@ -117,6 +144,33 @@ function loadTeamContent() {
 
 function saveTeamContent(content: TeamContent) {
   window.localStorage.setItem(teamStorageKey, JSON.stringify(content));
+}
+
+function loadAboutPageContent() {
+  if (typeof window === 'undefined') {
+    return defaultAboutPageContent;
+  }
+
+  const savedContent = window.localStorage.getItem(aboutPageStorageKey);
+
+  if (!savedContent) {
+    return defaultAboutPageContent;
+  }
+
+  try {
+    const parsed = JSON.parse(savedContent) as Partial<AboutPageContent>;
+    return {
+      ...defaultAboutPageContent,
+      ...parsed,
+      sections: parsed.sections || [],
+    };
+  } catch {
+    return defaultAboutPageContent;
+  }
+}
+
+function saveAboutPageContent(content: AboutPageContent) {
+  window.localStorage.setItem(aboutPageStorageKey, JSON.stringify(content));
 }
 
 function resizeImageForStorage(file: File) {
@@ -174,6 +228,14 @@ function getBlankMember(): TeamMember {
   };
 }
 
+function getBlankAboutSection(): AboutPageSection {
+  return {
+    title: 'New Section',
+    paragraph: 'Add section content here.',
+    image: '',
+  };
+}
+
 function renderMemberPhoto(member: TeamMember) {
   return (
     <>
@@ -192,6 +254,9 @@ function renderMemberPhoto(member: TeamMember) {
 }
 
 function AboutUs() {
+  const [aboutPageContent, setAboutPageContent] = useState(loadAboutPageContent);
+  const [draftAboutPageContent, setDraftAboutPageContent] = useState(aboutPageContent);
+  const [isAboutAdminOpen, setIsAboutAdminOpen] = useState(false);
   const [teamContent, setTeamContent] = useState(loadTeamContent);
   const [draftTeamContent, setDraftTeamContent] = useState(teamContent);
   const [isAdminOpen, setIsAdminOpen] = useState(false);
@@ -203,6 +268,11 @@ function AboutUs() {
   const openHrEditor = () => {
     setDraftTeamContent(teamContent);
     setIsAdminOpen(true);
+  };
+
+  const openAboutEditor = () => {
+    setDraftAboutPageContent(aboutPageContent);
+    setIsAboutAdminOpen(true);
   };
 
   const handleAdminLogin = (event: FormEvent<HTMLFormElement>) => {
@@ -226,6 +296,59 @@ function AboutUs() {
     } catch {
       setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
     }
+  };
+
+  const handleAboutPageSave = () => {
+    try {
+      saveAboutPageContent(draftAboutPageContent);
+      setAboutPageContent(draftAboutPageContent);
+      setSaveError('');
+      setIsAboutAdminOpen(false);
+    } catch {
+      setSaveError('Save failed. Try using a smaller image.');
+    }
+  };
+
+  const updateAboutPageContent = (field: keyof AboutPageContent, value: string) => {
+    setDraftAboutPageContent((content) => ({
+      ...content,
+      [field]: value,
+    }));
+  };
+
+  const deleteAboutImage = () => {
+    updateAboutPageContent('aboutImage', '');
+  };
+
+  const addAboutSection = () => {
+    setDraftAboutPageContent((content) => ({
+      ...content,
+      sections: [...content.sections, getBlankAboutSection()],
+    }));
+  };
+
+  const updateAboutSection = (
+    index: number,
+    field: keyof AboutPageSection,
+    value: string,
+  ) => {
+    setDraftAboutPageContent((content) => ({
+      ...content,
+      sections: content.sections.map((section, sectionIndex) =>
+        sectionIndex === index ? { ...section, [field]: value } : section,
+      ),
+    }));
+  };
+
+  const deleteAboutSection = (index: number) => {
+    setDraftAboutPageContent((content) => ({
+      ...content,
+      sections: content.sections.filter((_, sectionIndex) => sectionIndex !== index),
+    }));
+  };
+
+  const deleteAboutSectionImage = (index: number) => {
+    updateAboutSection(index, 'image', '');
   };
 
   const updateSectionHeading = (field: keyof TeamContent['heading'], value: string) => {
@@ -300,36 +423,83 @@ function AboutUs() {
     <div className="home-page">
       <section className="home-about">
         <div className="section-inner about-grid">
-          <div className="about-image-card" aria-label="Madison88 learning session"></div>
+          <div className="about-image-card" aria-label="Madison88 learning session">
+            {aboutPageContent.aboutImage && (
+              <img
+                src={aboutPageContent.aboutImage}
+                alt={aboutPageContent.aboutTitle}
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
+            )}
+          </div>
 
           <div className="about-copy">
-            <h2>We are Madison 88.</h2>
-            <p>
-              A privately held outdoor accessories company with a primary office
-              location in Denver, CO. We are a world-class design, development and
-              manufacturing company that can help reimagine what your assortments
-              can be.
-            </p>
+            <h2
+              onClick={(event) => {
+                if (event.detail === 3) {
+                  openAboutEditor();
+                }
+              }}
+              style={{ cursor: 'default', userSelect: 'none' }}
+            >
+              {aboutPageContent.aboutTitle}
+            </h2>
+            <p>{aboutPageContent.aboutParagraph}</p>
           </div>
         </div>
       </section>
 
       <section className="excellence-section">
         <div className="section-inner excellence-content">
-          <h2>Madison 88 Center for Excellence</h2>
-          <p>
-            At Madison 88 Center for Excellence, our mission is to empower
-            employees with the skills and mindset needed to thrive in an
-            ever-evolving business landscape. We aim to <strong>upskill</strong>{' '}
-            and <strong>future-proof our workforce</strong>, fostering innovation
-            and adaptability not only within the industries we serve but also in
-            each individual's personal career journey. Through continuous
-            learning, cutting-edge training, and a culture of growth, we prepare
-            our people to lead with confidence, embrace change, and unlock their
-            full potential.
-          </p>
+          <h2
+            onClick={(event) => {
+              if (event.detail === 3) {
+                openAboutEditor();
+              }
+            }}
+            style={{ cursor: 'default', userSelect: 'none' }}
+          >
+            {aboutPageContent.excellenceTitle}
+          </h2>
+          <p>{aboutPageContent.excellenceParagraph}</p>
         </div>
       </section>
+
+      {aboutPageContent.sections.map((section, index) => (
+        <section
+          className={`about-extra-section${section.image ? '' : ' about-extra-section-no-image'}`}
+          key={`${section.title}-${index}`}
+        >
+          <div className="section-inner about-extra-grid">
+            {section.image && (
+              <div className="about-extra-image-card">
+                <img
+                  src={section.image}
+                  alt={section.title}
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                  }}
+                />
+              </div>
+            )}
+            <div className="about-copy">
+              <h2
+                onClick={(event) => {
+                  if (event.detail === 3) {
+                    openAboutEditor();
+                  }
+                }}
+                style={{ cursor: 'default', userSelect: 'none' }}
+              >
+                {section.title}
+              </h2>
+              <p>{section.paragraph}</p>
+            </div>
+          </div>
+        </section>
+      ))}
 
       <section className="specialists-section">
         <div className="section-inner">
@@ -424,6 +594,249 @@ function AboutUs() {
           </div>
         </div>
       </section>
+
+      {isAboutAdminOpen && (
+        <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="About page editor">
+          <div className="hr-admin-modal">
+            <div className="hr-admin-header">
+              <div>
+                <p className="section-kicker">About Admin</p>
+                <h2>{isHrLoggedIn ? 'Edit About Page' : 'Admin Login'}</h2>
+              </div>
+              <button
+                className="hr-admin-close"
+                type="button"
+                onClick={() => {
+                  setIsAboutAdminOpen(false);
+                  setLoginError('');
+                  setSaveError('');
+                }}
+                aria-label="Close about admin"
+              >
+                x
+              </button>
+            </div>
+
+            {!isHrLoggedIn ? (
+              <form className="hr-admin-login" onSubmit={handleAdminLogin}>
+                <label>
+                  Username
+                  <input
+                    value={loginForm.username}
+                    onChange={(event) => {
+                      setLoginForm((form) => ({ ...form, username: event.target.value }));
+                    }}
+                  />
+                </label>
+                <label>
+                  Password
+                  <input
+                    type="password"
+                    value={loginForm.password}
+                    onChange={(event) => {
+                      setLoginForm((form) => ({ ...form, password: event.target.value }));
+                    }}
+                  />
+                </label>
+                {loginError && <p className="hr-admin-error">{loginError}</p>}
+                <button className="hr-admin-primary" type="submit">
+                  Login
+                </button>
+              </form>
+            ) : (
+              <div className="hr-admin-editor">
+                <section className="hr-admin-editor-section">
+                  <h3>About Section</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Title
+                      <input
+                        maxLength={80}
+                        value={draftAboutPageContent.aboutTitle}
+                        onChange={(event) => {
+                          updateAboutPageContent('aboutTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <div className="hr-admin-upload-field">
+                      <span>Image</span>
+                      <div className="hr-admin-upload">
+                        <div className="hr-admin-photo-preview">
+                          {draftAboutPageContent.aboutImage && (
+                            <img
+                              src={draftAboutPageContent.aboutImage}
+                              alt={draftAboutPageContent.aboutTitle}
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          )}
+                          <span>About</span>
+                        </div>
+                        <input
+                          id="about-page-image-upload"
+                          className="hr-admin-file-input"
+                          type="file"
+                          accept="image/*"
+                          onChange={(event) => {
+                            handleImageUpload(event, (image) => {
+                              updateAboutPageContent('aboutImage', image);
+                            });
+                          }}
+                        />
+                        <label className="hr-admin-file-button" htmlFor="about-page-image-upload">
+                          Choose File
+                        </label>
+                      </div>
+                    </div>
+                  </div>
+                  <label>
+                    Paragraph
+                    <textarea
+                      maxLength={500}
+                      value={draftAboutPageContent.aboutParagraph}
+                      onChange={(event) => {
+                        updateAboutPageContent('aboutParagraph', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <button className="hr-admin-delete" type="button" onClick={deleteAboutImage}>
+                    Delete Image
+                  </button>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <h3>Center for Excellence Section</h3>
+                  <label>
+                    Title
+                    <input
+                      maxLength={90}
+                      value={draftAboutPageContent.excellenceTitle}
+                      onChange={(event) => {
+                        updateAboutPageContent('excellenceTitle', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Paragraph
+                    <textarea
+                      maxLength={900}
+                      value={draftAboutPageContent.excellenceParagraph}
+                      onChange={(event) => {
+                        updateAboutPageContent('excellenceParagraph', event.target.value);
+                      }}
+                    />
+                  </label>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <div className="hr-admin-section-heading">
+                    <h3>Additional Sections</h3>
+                    <button className="hr-admin-small-action" type="button" onClick={addAboutSection}>
+                      Add Section
+                    </button>
+                  </div>
+
+                  <div className="featured-course-admin-list">
+                    {draftAboutPageContent.sections.map((section, index) => (
+                      <div className="featured-course-admin-card" key={`about-section-${index}`}>
+                        <div className="featured-course-admin-preview">
+                          {section.image ? (
+                            <img
+                              src={section.image}
+                              alt={section.title}
+                              onError={(event) => {
+                                event.currentTarget.style.display = 'none';
+                              }}
+                            />
+                          ) : (
+                            <span>No image</span>
+                          )}
+                        </div>
+
+                        <div className="featured-course-admin-fields">
+                          <label>
+                            Title
+                            <input
+                              maxLength={90}
+                              value={section.title}
+                              onChange={(event) => {
+                                updateAboutSection(index, 'title', event.target.value);
+                              }}
+                            />
+                          </label>
+                          <label>
+                            Paragraph
+                            <textarea
+                              maxLength={900}
+                              value={section.paragraph}
+                              onChange={(event) => {
+                                updateAboutSection(index, 'paragraph', event.target.value);
+                              }}
+                            />
+                          </label>
+
+                          <div className="featured-course-admin-actions">
+                            <label>
+                              Image
+                              <input
+                                id={`about-extra-section-image-${index}`}
+                                className="hr-admin-file-input"
+                                type="file"
+                                accept="image/*"
+                                onChange={(event) => {
+                                  handleImageUpload(event, (image) => {
+                                    updateAboutSection(index, 'image', image);
+                                  });
+                                }}
+                              />
+                              <span className="hr-admin-file-button">Choose File</span>
+                            </label>
+                            <button
+                              className="hr-admin-delete"
+                              type="button"
+                              onClick={() => {
+                                deleteAboutSectionImage(index);
+                              }}
+                            >
+                              Delete Image
+                            </button>
+                            <button
+                              className="hr-admin-delete"
+                              type="button"
+                              onClick={() => {
+                                deleteAboutSection(index);
+                              }}
+                            >
+                              Delete Section
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </section>
+
+                <div className="hr-admin-actions">
+                  {saveError && <p className="hr-admin-error">{saveError}</p>}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setDraftAboutPageContent(aboutPageContent);
+                      setIsAboutAdminOpen(false);
+                    }}
+                  >
+                    Cancel
+                  </button>
+                  <button className="hr-admin-primary" type="button" onClick={handleAboutPageSave}>
+                    Save Changes
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {isAdminOpen && (
         <div className="hr-admin-overlay" role="dialog" aria-modal="true" aria-label="HR team editor">
