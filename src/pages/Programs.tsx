@@ -1,6 +1,7 @@
 import type { ChangeEvent, FormEvent } from 'react';
 import { useState } from 'react';
 import {
+  getProgramThumbnail,
   programs,
   type Program,
   type ProgramDetailContent,
@@ -257,12 +258,13 @@ function Programs() {
 
       <div className="programs-card-grid">
         {programContent.map((program) => {
+          const thumbnail = getProgramThumbnail(program);
           const cardInner = (
             <>
-              {program.image && (
+              {thumbnail && (
                 <img
-                  key={program.image}
-                  src={program.image}
+                  key={thumbnail}
+                  src={thumbnail}
                   alt={program.title}
                   onLoad={(event) => {
                     event.currentTarget.style.display = 'block';
@@ -351,25 +353,27 @@ function Programs() {
                       Add Card
                     </button>
                   </div>
-                  {draftProgramContent.map((program) => (
-                    <div className="program-admin-card-block" key={program.slug}>
-                      <div className="program-admin-card-row">
-                        <div className="program-admin-preview">
-                          {program.image && (
-                            <img
-                              key={program.image}
-                              src={program.image}
-                              alt={program.title}
-                              onLoad={(event) => {
-                                event.currentTarget.style.display = 'block';
-                              }}
-                              onError={(event) => {
-                                event.currentTarget.style.display = 'none';
-                              }}
-                            />
-                          )}
-                          <span>{program.title.charAt(0)}</span>
-                        </div>
+                  {draftProgramContent.map((program) => {
+                    const thumbnail = getProgramThumbnail(program);
+                    return (
+                      <div className="program-admin-card-block" key={program.slug}>
+                        <div className="program-admin-card-row">
+                          <div className="program-admin-preview">
+                            {thumbnail && (
+                              <img
+                                key={thumbnail}
+                                src={thumbnail}
+                                alt={program.title}
+                                onLoad={(event) => {
+                                  event.currentTarget.style.display = 'block';
+                                }}
+                                onError={(event) => {
+                                  event.currentTarget.style.display = 'none';
+                                }}
+                              />
+                            )}
+                            <span>{program.title.charAt(0)}</span>
+                          </div>
                         <div className="program-admin-photo-actions">
                           <label>
                             Photo
@@ -437,7 +441,8 @@ function Programs() {
                         </button>
                       </div>
                     </div>
-                  ))}
+                    );
+                  })}
                 </section>
 
                 <div className="hr-admin-actions">
