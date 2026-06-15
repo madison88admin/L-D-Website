@@ -1,5 +1,6 @@
 import type { ChangeEvent, FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 type TeamMember = {
   title?: string;
@@ -142,8 +143,8 @@ function loadTeamContent() {
   }
 }
 
-function saveTeamContent(content: TeamContent) {
-  window.localStorage.setItem(teamStorageKey, JSON.stringify(content));
+async function saveTeamContent(content: TeamContent) {
+  await saveSiteContent(teamStorageKey, content);
 }
 
 function loadAboutPageContent() {
@@ -169,8 +170,16 @@ function loadAboutPageContent() {
   }
 }
 
-function saveAboutPageContent(content: AboutPageContent) {
-  window.localStorage.setItem(aboutPageStorageKey, JSON.stringify(content));
+function normalizeAboutPageContent(content: Partial<AboutPageContent>): AboutPageContent {
+  return {
+    ...defaultAboutPageContent,
+    ...content,
+    sections: content.sections || [],
+  };
+}
+
+async function saveAboutPageContent(content: AboutPageContent) {
+  await saveSiteContent(aboutPageStorageKey, content);
 }
 
 function resizeImageForStorage(file: File) {
@@ -265,6 +274,32 @@ function AboutUs() {
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
 
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSharedContent() {
+      const [nextAboutPageContent, nextTeamContent] = await Promise.all([
+        loadSiteContent(aboutPageStorageKey, defaultAboutPageContent, normalizeAboutPageContent),
+        loadSiteContent(teamStorageKey, defaultTeamContent),
+      ]);
+
+      if (!isMounted) return;
+
+      setAboutPageContent(nextAboutPageContent);
+      setDraftAboutPageContent(nextAboutPageContent);
+      setTeamContent(nextTeamContent);
+      setDraftTeamContent(nextTeamContent);
+    }
+
+    loadSharedContent().catch(() => {
+      setSaveError('Unable to load shared content from Supabase. Showing local/default content.');
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const openHrEditor = () => {
     setDraftTeamContent(teamContent);
     setIsAdminOpen(true);
@@ -287,25 +322,25 @@ function AboutUs() {
     setLoginError('Invalid HR login.');
   };
 
-  const handleTeamSave = () => {
+  const handleTeamSave = async () => {
     try {
-      saveTeamContent(draftTeamContent);
+      await saveTeamContent(draftTeamContent);
       setTeamContent(draftTeamContent);
       setSaveError('');
       setIsAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
     }
   };
 
-  const handleAboutPageSave = () => {
+  const handleAboutPageSave = async () => {
     try {
-      saveAboutPageContent(draftAboutPageContent);
+      await saveAboutPageContent(draftAboutPageContent);
       setAboutPageContent(draftAboutPageContent);
       setSaveError('');
       setIsAboutAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using a smaller image.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
     }
   };
 

@@ -1,11 +1,12 @@
 import type { ChangeEvent, FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getProgramThumbnail,
   programs,
   type Program,
   type ProgramDetailContent,
 } from '../data/programs';
+import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 const programsStorageKey = 'madison88-program-content';
 const adminUsername = 'hr-admin';
@@ -59,8 +60,41 @@ function loadPrograms() {
   }
 }
 
-function savePrograms(content: Program[]) {
-  window.localStorage.setItem(programsStorageKey, JSON.stringify(content));
+function normalizePrograms(content: Program[]) {
+  const savedSlugs = new Set(content.map((program) => program.slug));
+  const mergedPrograms = programs.filter((program) => savedSlugs.has(program.slug)).map((program) => {
+    const savedProgram = content.find((item) => item.slug === program.slug);
+    const mergedProgram = {
+      ...program,
+      ...savedProgram,
+      detail: {
+        ...program.detail,
+        ...savedProgram?.detail,
+      },
+    };
+
+    if (program.slug === 'communication' && savedProgram?.title === 'Communication') {
+      mergedProgram.title = program.title;
+    }
+
+    if (
+      program.slug === 'problem-solving-critical-thinking' &&
+      savedProgram?.title === 'Problem-solving & Critical Thinking'
+    ) {
+      mergedProgram.title = program.title;
+    }
+
+    return mergedProgram;
+  });
+  const addedPrograms = content.filter(
+    (savedProgram) => !programs.some((program) => program.slug === savedProgram.slug),
+  );
+
+  return [...mergedPrograms, ...addedPrograms];
+}
+
+async function savePrograms(content: Program[]) {
+  await saveSiteContent(programsStorageKey, content);
 }
 
 function resizeImageForStorage(file: File) {
@@ -157,6 +191,24 @@ function Programs() {
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
 
+  useEffect(() => {
+    let isMounted = true;
+
+    loadSiteContent(programsStorageKey, programs, normalizePrograms)
+      .then((nextProgramContent) => {
+        if (!isMounted) return;
+        setProgramContent(nextProgramContent);
+        setDraftProgramContent(nextProgramContent);
+      })
+      .catch(() => {
+        setSaveError('Unable to load shared content from Supabase. Showing local/default content.');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
+
   const openAdmin = () => {
     setDraftProgramContent(programContent);
     setIsAdminOpen(true);
@@ -224,21 +276,21 @@ function Programs() {
 
       setDraftProgramContent(nextDraftContent);
       setProgramContent(nextProgramContent);
-      savePrograms(nextProgramContent);
+      await savePrograms(nextProgramContent);
       setSaveError('');
     } catch {
-      setSaveError('Image upload failed. Please try a different image.');
+      setSaveError('Image upload failed. Check Supabase access or try a smaller image.');
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     try {
-      savePrograms(draftProgramContent);
+      await savePrograms(draftProgramContent);
       setProgramContent(draftProgramContent);
       setSaveError('');
       setIsAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
     }
   };
 

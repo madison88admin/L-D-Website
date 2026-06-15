@@ -1,7 +1,8 @@
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getLinkThumbnail, getProgramThumbnail, programs, type Program } from '../data/programs';
+import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 const programsStorageKey = 'madison88-program-content';
 
@@ -23,6 +24,18 @@ function loadPrograms(): Program[] {
   } catch {
     return programs;
   }
+}
+
+function normalizePrograms(content: Program[]) {
+  const savedSlugs = new Set(content.map((p) => p.slug));
+  const merged = programs
+    .filter((p) => savedSlugs.has(p.slug))
+    .map((p) => {
+      const saved = content.find((s) => s.slug === p.slug);
+      return { ...p, ...saved, detail: { ...p.detail, ...saved?.detail } };
+    });
+  const added = content.filter((s) => !programs.some((p) => p.slug === s.slug));
+  return [...merged, ...added];
 }
 
 type ProgramPreviewStyle = CSSProperties & {
@@ -99,8 +112,8 @@ function loadFeaturedSlugs(allPrograms: typeof programs): string[] {
   return allPrograms.slice(0, MAX_FEATURED).map((p) => p.slug);
 }
 
-function saveFeaturedSlugs(slugs: string[]) {
-  window.localStorage.setItem(featuredStorageKey, JSON.stringify(slugs));
+async function saveFeaturedSlugs(slugs: string[]) {
+  await saveSiteContent(featuredStorageKey, slugs);
 }
 const teamFieldLimits = {
   specialistName: 60,
@@ -254,8 +267,8 @@ function loadTeamContent() {
   }
 }
 
-function saveTeamContent(content: TeamContent) {
-  window.localStorage.setItem(teamStorageKey, JSON.stringify(content));
+async function saveTeamContent(content: TeamContent) {
+  await saveSiteContent(teamStorageKey, content);
 }
 
 function loadFeaturedCoursesContent() {
@@ -296,8 +309,31 @@ function loadFeaturedCoursesContent() {
   }
 }
 
-function saveFeaturedCoursesContent(content: FeaturedCoursesContent) {
-  window.localStorage.setItem(featuredCoursesStorageKey, JSON.stringify(content));
+function normalizeFeaturedCoursesContent(content: Partial<
+  Omit<FeaturedCoursesContent, 'cards'> & {
+    cards: Array<Partial<FeaturedCourseCard> & { theme?: FeaturedCourseCard['column'] }>;
+  }
+>): FeaturedCoursesContent {
+  const cards = content.cards?.length
+    ? content.cards.map((card) => ({
+        title: card.title || 'Course',
+        subtitle: card.subtitle || '',
+        description: card.description || '',
+        link: card.link || '',
+        image: card.image || '',
+        column: card.column || card.theme || 'copilot',
+      }))
+    : defaultFeaturedCoursesContent.cards;
+
+  return {
+    ...defaultFeaturedCoursesContent,
+    ...content,
+    cards,
+  };
+}
+
+async function saveFeaturedCoursesContent(content: FeaturedCoursesContent) {
+  await saveSiteContent(featuredCoursesStorageKey, content);
 }
 
 function loadHomeHeroContent() {
@@ -318,8 +354,8 @@ function loadHomeHeroContent() {
   }
 }
 
-function saveHomeHeroContent(content: HomeHeroContent) {
-  window.localStorage.setItem(homeHeroStorageKey, JSON.stringify(content));
+async function saveHomeHeroContent(content: HomeHeroContent) {
+  await saveSiteContent(homeHeroStorageKey, content);
 }
 
 function resizeImageForStorage(file: File) {
@@ -413,7 +449,7 @@ function Home() {
   const [homeHeroContent, setHomeHeroContent] = useState(loadHomeHeroContent);
   const [draftHomeHeroContent, setDraftHomeHeroContent] = useState(homeHeroContent);
   const [isHeroAdminOpen, setIsHeroAdminOpen] = useState(false);
-  const [allPrograms] = useState(loadPrograms);
+  const [allPrograms, setAllPrograms] = useState(loadPrograms);
   const [featuredSlugs, setFeaturedSlugs] = useState(() => loadFeaturedSlugs(programs));
   const [draftFeaturedSlugs, setDraftFeaturedSlugs] = useState(featuredSlugs);
   const [isFeaturedAdminOpen, setIsFeaturedAdminOpen] = useState(false);
@@ -427,6 +463,51 @@ function Home() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSharedContent() {
+      const [
+        nextHomeHeroContent,
+        nextPrograms,
+        nextFeaturedSlugs,
+        nextFeaturedCoursesContent,
+        nextTeamContent,
+      ] = await Promise.all([
+        loadSiteContent(homeHeroStorageKey, defaultHomeHeroContent, (content) => ({
+          ...defaultHomeHeroContent,
+          ...content,
+        })),
+        loadSiteContent(programsStorageKey, programs, normalizePrograms),
+        loadSiteContent(featuredStorageKey, programs.slice(0, MAX_FEATURED).map((p) => p.slug), (content) =>
+          Array.isArray(content) && content.length > 0 ? content.slice(0, MAX_FEATURED) : programs.slice(0, MAX_FEATURED).map((p) => p.slug),
+        ),
+        loadSiteContent(featuredCoursesStorageKey, defaultFeaturedCoursesContent, normalizeFeaturedCoursesContent),
+        loadSiteContent(teamStorageKey, defaultTeamContent),
+      ]);
+
+      if (!isMounted) return;
+
+      setHomeHeroContent(nextHomeHeroContent);
+      setDraftHomeHeroContent(nextHomeHeroContent);
+      setAllPrograms(nextPrograms);
+      setFeaturedSlugs(nextFeaturedSlugs);
+      setDraftFeaturedSlugs(nextFeaturedSlugs);
+      setFeaturedCoursesContent(nextFeaturedCoursesContent);
+      setDraftFeaturedCoursesContent(nextFeaturedCoursesContent);
+      setTeamContent(nextTeamContent);
+      setDraftTeamContent(nextTeamContent);
+    }
+
+    loadSharedContent().catch(() => {
+      setSaveError('Unable to load shared content from Supabase. Showing local/default content.');
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const programHighlights = allPrograms
     .filter((p) => featuredSlugs.includes(p.slug))
@@ -455,10 +536,15 @@ function Home() {
     });
   };
 
-  const saveFeatured = () => {
-    saveFeaturedSlugs(draftFeaturedSlugs);
-    setFeaturedSlugs(draftFeaturedSlugs);
-    setIsFeaturedAdminOpen(false);
+  const saveFeatured = async () => {
+    try {
+      await saveFeaturedSlugs(draftFeaturedSlugs);
+      setFeaturedSlugs(draftFeaturedSlugs);
+      setSaveError('');
+      setIsFeaturedAdminOpen(false);
+    } catch {
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    }
   };
 
   const openHrEditor = () => {
@@ -478,36 +564,36 @@ function Home() {
     setLoginError('Invalid HR login.');
   };
 
-  const handleTeamSave = () => {
+  const handleTeamSave = async () => {
     try {
-      saveTeamContent(draftTeamContent);
+      await saveTeamContent(draftTeamContent);
       setTeamContent(draftTeamContent);
       setSaveError('');
       setIsAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
     }
   };
 
-  const handleFeaturedCoursesSave = () => {
+  const handleFeaturedCoursesSave = async () => {
     try {
-      saveFeaturedCoursesContent(draftFeaturedCoursesContent);
+      await saveFeaturedCoursesContent(draftFeaturedCoursesContent);
       setFeaturedCoursesContent(draftFeaturedCoursesContent);
       setSaveError('');
       setIsFeaturedCoursesAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
     }
   };
 
-  const handleHeroSave = () => {
+  const handleHeroSave = async () => {
     try {
-      saveHomeHeroContent(draftHomeHeroContent);
+      await saveHomeHeroContent(draftHomeHeroContent);
       setHomeHeroContent(draftHomeHeroContent);
       setSaveError('');
       setIsHeroAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller files.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
     }
   };
 
