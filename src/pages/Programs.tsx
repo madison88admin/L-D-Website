@@ -1,11 +1,14 @@
 import type { ChangeEvent, FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   getProgramThumbnail,
+  legacyProgramTitles,
   programs,
   type Program,
   type ProgramDetailContent,
 } from '../data/programs';
+import { uploadImageToStorage } from '../lib/imageStorage';
+import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 const programsStorageKey = 'madison88-program-content';
 const adminUsername = 'hr-admin';
@@ -24,88 +27,58 @@ function loadPrograms() {
 
   try {
     const parsedPrograms = JSON.parse(savedPrograms) as Program[];
-    const savedSlugs = new Set(parsedPrograms.map((program) => program.slug));
-    const mergedPrograms = programs.filter((program) => savedSlugs.has(program.slug)).map((program) => {
-      const savedProgram = parsedPrograms.find((item) => item.slug === program.slug);
-      const mergedProgram = {
-        ...program,
-        ...savedProgram,
-        detail: {
-          ...program.detail,
-          ...savedProgram?.detail,
-        },
-      };
+    if (!parsedPrograms.length) return programs;
 
-      if (program.slug === 'communication' && savedProgram?.title === 'Communication') {
-        mergedProgram.title = program.title;
-      }
+    return parsedPrograms
+      .filter((savedProgram) => !(savedProgram.title === 'New Program' && !savedProgram.image && !savedProgram.link))
+      .map((savedProgram) => {
+        const defaultProgram = programs.find((program) => program.slug === savedProgram.slug);
+        const mergedProgram = {
+          ...defaultProgram,
+          ...savedProgram,
+          detail: {
+            ...defaultProgram?.detail,
+            ...savedProgram.detail,
+          },
+        } as Program;
 
-      if (
-        program.slug === 'problem-solving-critical-thinking' &&
-        savedProgram?.title === 'Problem-solving & Critical Thinking'
-      ) {
-        mergedProgram.title = program.title;
-      }
+        if (defaultProgram && savedProgram.title && legacyProgramTitles[savedProgram.slug]?.includes(savedProgram.title)) {
+          mergedProgram.title = defaultProgram.title;
+        }
 
-      return mergedProgram;
-    });
-    const addedPrograms = parsedPrograms.filter(
-      (savedProgram) => !programs.some((program) => program.slug === savedProgram.slug),
-    );
-
-    return [...mergedPrograms, ...addedPrograms];
+        return mergedProgram;
+      });
   } catch {
     return programs;
   }
 }
 
-function savePrograms(content: Program[]) {
-  window.localStorage.setItem(programsStorageKey, JSON.stringify(content));
+function normalizePrograms(content: Program[]) {
+  if (!content.length) return programs;
+
+  return content
+    .filter((savedProgram) => !(savedProgram.title === 'New Program' && !savedProgram.image && !savedProgram.link))
+    .map((savedProgram) => {
+      const defaultProgram = programs.find((program) => program.slug === savedProgram.slug);
+      const mergedProgram = {
+        ...defaultProgram,
+        ...savedProgram,
+        detail: {
+          ...defaultProgram?.detail,
+          ...savedProgram.detail,
+        },
+      } as Program;
+
+      if (defaultProgram && savedProgram.title && legacyProgramTitles[savedProgram.slug]?.includes(savedProgram.title)) {
+        mergedProgram.title = defaultProgram.title;
+      }
+
+      return mergedProgram;
+    });
 }
 
-function resizeImageForStorage(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const image = new Image();
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to read image file.'));
-        return;
-      }
-
-      image.src = reader.result;
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Unable to read image file.'));
-    };
-
-    image.onload = () => {
-      const maxSize = 900;
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.round(image.width * scale);
-      const height = Math.round(image.height * scale);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Unable to prepare image.'));
-        return;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.84));
-    };
-
-    image.onerror = () => {
-      reject(new Error('Unable to load image file.'));
-    };
-
-    reader.readAsDataURL(file);
-  });
+async function savePrograms(content: Program[]) {
+  await saveSiteContent(programsStorageKey, content);
 }
 
 function slugifyTitle(title: string) {
@@ -156,6 +129,25 @@ function Programs() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    loadSiteContent(programsStorageKey, programs, normalizePrograms)
+      .then((nextProgramContent) => {
+        if (!isMounted) return;
+        setProgramContent(nextProgramContent);
+        setDraftProgramContent(nextProgramContent);
+      })
+      .catch(() => {
+        setSaveError('Unable to load shared content from Supabase. Showing local/default content.');
+      });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const openAdmin = () => {
     setDraftProgramContent(programContent);
@@ -206,39 +198,54 @@ function Programs() {
     );
   };
 
+  const moveProgram = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftProgramContent((content) => {
+      if (toIndex >= content.length) return content;
+
+      const nextPrograms = [...content];
+      const [movedProgram] = nextPrograms.splice(fromIndex, 1);
+      nextPrograms.splice(toIndex, 0, movedProgram);
+
+      return nextPrograms;
+    });
+  };
+
   const handleImageUpload = async (event: ChangeEvent<HTMLInputElement>, slug: string) => {
     const file = event.target.files?.[0];
+    const input = event.currentTarget;
 
     if (!file) {
       return;
     }
 
     try {
-      const resizedImage = await resizeImageForStorage(file);
+      const imageUrl = await uploadImageToStorage(file, 'programs');
       const nextDraftContent = draftProgramContent.map((program) =>
-        program.slug === slug ? { ...program, image: resizedImage } : program,
-      );
-      const nextProgramContent = programContent.map((program) =>
-        program.slug === slug ? { ...program, image: resizedImage } : program,
+        program.slug === slug ? { ...program, image: imageUrl } : program,
       );
 
       setDraftProgramContent(nextDraftContent);
-      setProgramContent(nextProgramContent);
-      savePrograms(nextProgramContent);
       setSaveError('');
     } catch {
-      setSaveError('Image upload failed. Please try a different image.');
+      setSaveError('Image upload failed. Check Supabase access or try a smaller image.');
+    } finally {
+      input.value = '';
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
+    setIsSaving(true);
     try {
-      savePrograms(draftProgramContent);
+      await savePrograms(draftProgramContent);
       setProgramContent(draftProgramContent);
       setSaveError('');
       setIsAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -353,13 +360,31 @@ function Programs() {
                       Add Card
                     </button>
                   </div>
-                  {draftProgramContent.map((program) => {
+                  {draftProgramContent.map((program, index) => {
                     const thumbnail = getProgramThumbnail(program);
                     return (
                       <div className="program-admin-card-block" key={program.slug}>
+                        <div className="hr-admin-reorder-controls" aria-label="Reorder program card">
+                          <button
+                            type="button"
+                            onClick={() => moveProgram(index, index - 1)}
+                            disabled={index === 0}
+                            aria-label={`Move ${program.title} up`}
+                          >
+                            ▲
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => moveProgram(index, index + 1)}
+                            disabled={index === draftProgramContent.length - 1}
+                            aria-label={`Move ${program.title} down`}
+                          >
+                            ▼
+                          </button>
+                        </div>
                         <div className="program-admin-card-row">
                           <div className="program-admin-preview">
-                            {thumbnail && (
+                            {thumbnail ? (
                               <img
                                 key={thumbnail}
                                 src={thumbnail}
@@ -371,8 +396,9 @@ function Programs() {
                                   event.currentTarget.style.display = 'none';
                                 }}
                               />
+                            ) : (
+                              <span>{program.title.charAt(0)}</span>
                             )}
-                            <span>{program.title.charAt(0)}</span>
                           </div>
                         <div className="program-admin-photo-actions">
                           <label>
@@ -456,8 +482,8 @@ function Programs() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>

@@ -62,15 +62,36 @@ const defaultDetail = (
   alignment: 'left',
 });
 
-export const programs: Program[] = [
+export const legacyProgramTitles: Record<string, string[]> = {
+  'ai-technology': ['AI & Technology'],
+  communication: ['Communications'],
+  'emotional-intelligence-well-being': ['Emotional Intelligence & Well-being'],
+  interpersonal: ['Interpersonal'],
+  leadership: ['Leadership'],
+  'problem-solving-critical-thinking': ['Problem-Solving & Critical Thinking'],
+  'productivity-mindfulness': ['Productivity & Mindfulness'],
+};
+
+const programOrder = [
+  'ai-technology',
+  'communication',
+  'customer-service',
+  'emotional-intelligence-well-being',
+  'leadership',
+  'interpersonal',
+  'problem-solving-critical-thinking',
+  'productivity-mindfulness',
+];
+
+const programCatalog: Program[] = [
   {
     slug: 'ai-technology',
-    title: 'AI & Technology',
-    summary: 'Explore practical tools and digital skills for smarter, more adaptive work.',
+    title: 'AI & Information Technology',
+    summary: 'Explore practical AI tools, digital systems, and technology skills for smarter work.',
     accent: '#5dbdca',
     image: '/images/programs/ai-technology.jpg',
     detail: defaultDetail(
-      'AI & Technology',
+      'AI & Information Technology',
       '',
       'Topics:',
       '',
@@ -79,12 +100,12 @@ export const programs: Program[] = [
   },
   {
     slug: 'communication',
-    title: 'Communications',
+    title: 'Communication',
     summary: 'Build clearer messaging, active listening, and confident workplace conversations.',
     accent: '#69aee7',
     image: '/images/programs/communication.jpg',
     detail: defaultDetail(
-      'Communications',
+      'Communication',
       'Skills Training',
       'Topics:',
       '',
@@ -107,13 +128,13 @@ export const programs: Program[] = [
   },
   {
     slug: 'emotional-intelligence-well-being',
-    title: 'Emotional Intelligence & Well-being',
-    summary: 'Build self-awareness, resilience, empathy, and healthier workplace habits.',
+    title: 'Departmental & Position-Based Trainings (PBTs)',
+    summary: 'Support role-specific learning paths, team standards, and department training needs.',
     accent: '#7fb36d',
     image: '/images/programs/emotional-intelligence.jpg',
     detail: defaultDetail(
-      'Emotional Intelligence &\nWell-being',
-      '',
+      'Departmental & Position-Based Trainings (PBTs)',
+      'Role-Based Learning',
       'Topics:',
       '',
       '• {{The Emotional Intelligence Advantage:}} Mastering Change and Difficult Conversations *Upcoming training',
@@ -121,13 +142,13 @@ export const programs: Program[] = [
   },
   {
     slug: 'interpersonal',
-    title: 'Interpersonal',
-    summary: 'Improve collaboration, trust-building, feedback, and professional relationships.',
+    title: 'Organizational & Cultural Development',
+    summary: 'Strengthen culture, collaboration, change readiness, and shared ways of working.',
     accent: '#9b8de3',
     image: '/images/programs/interpersonal.jpg',
     detail: defaultDetail(
-      'Interpersonal',
-      'Skills',
+      'Organizational & Cultural Development',
+      'Culture & Change',
       'Topics:',
       '',
       '• 15 Ways to Develop and Maintain a Positive Attitude at Work *Upcoming training\n• Important Conflict Resolution Skills in the Workplace *Upcoming training',
@@ -135,12 +156,12 @@ export const programs: Program[] = [
   },
   {
     slug: 'leadership',
-    title: 'Leadership',
+    title: 'Leadership Development',
     summary: 'Develop decision-making, coaching, accountability, and team leadership habits.',
     accent: '#65c29b',
     image: '/images/programs/leadership.jpg',
     detail: defaultDetail(
-      'Leadership',
+      'Leadership Development',
       'Development',
       'Topics:',
       '',
@@ -355,33 +376,37 @@ export const programs: Program[] = [
   },
   {
     slug: 'problem-solving-critical-thinking',
-    title: 'Problem-Solving & Critical Thinking',
-    summary: 'Apply structured thinking to analyze challenges and make stronger decisions.',
+    title: 'Personal Development',
+    summary: 'Build self-awareness, confidence, resilience, and habits for continuous growth.',
     accent: '#e77979',
     image: '/images/programs/problem-solving.jpg',
     detail: defaultDetail(
-      'Problem-Solving & Critical Thinking',
-      'Skills',
+      'Personal Development',
+      'Growth',
       'Topics:',
       '',
-      'Structured problem analysis\nRoot cause thinking\nDecision-making frameworks',
+      'Self-awareness\nResilience and well-being\nGrowth mindset and personal effectiveness',
     ),
   },
   {
     slug: 'productivity-mindfulness',
-    title: 'Productivity & Mindfulness',
-    summary: 'Improve focus, prioritization, time management, and sustainable performance.',
+    title: 'Professional & Technical Skills',
+    summary: 'Develop practical business, technical, productivity, and role-ready capabilities.',
     accent: '#d7a85b',
     image: '/images/programs/productivity-mindfulness.jpg',
     detail: defaultDetail(
-      'Productivity &\nMindfulness',
-      '',
+      'Professional & Technical Skills',
+      'Skills Training',
       'Topics:',
       '',
       '• The Mindful \'Yes\' and \'No\': How to Make Choices with Clarity and Integrity *Upcoming training\n• Boost Memory and Focus with Mindfulness: Science-Backed Techniques *Upcoming training\n• How to Create Productive Morning Routine *Upcoming training',
     ),
   },
 ];
+
+export const programs: Program[] = [...programCatalog].sort(
+  (a, b) => programOrder.indexOf(a.slug) - programOrder.indexOf(b.slug),
+);
 
 export function getProgramBySlug(slug: string | undefined) {
   return programs.find((program) => program.slug === slug);
