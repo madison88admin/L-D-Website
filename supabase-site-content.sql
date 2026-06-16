@@ -64,3 +64,47 @@ on conflict (key) do nothing;
 
 -- Ask Supabase/PostgREST to refresh its schema cache after creating the table.
 notify pgrst, 'reload schema';
+
+-- Public image bucket used by the website editors.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'site-images',
+  'site-images',
+  true,
+  5242880,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif']
+)
+on conflict (id) do update
+set
+  public = excluded.public,
+  file_size_limit = excluded.file_size_limit,
+  allowed_mime_types = excluded.allowed_mime_types;
+
+drop policy if exists "Anyone can read site editor images" on storage.objects;
+create policy "Anyone can read site editor images"
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'site-images');
+
+drop policy if exists "Website editors can upload site images" on storage.objects;
+create policy "Website editors can upload site images"
+on storage.objects
+for insert
+to anon, authenticated
+with check (bucket_id = 'site-images');
+
+drop policy if exists "Website editors can see site images" on storage.objects;
+create policy "Website editors can see site images"
+on storage.objects
+for select
+to anon, authenticated
+using (bucket_id = 'site-images');
+
+drop policy if exists "Website editors can update site images" on storage.objects;
+create policy "Website editors can update site images"
+on storage.objects
+for update
+to anon, authenticated
+using (bucket_id = 'site-images')
+with check (bucket_id = 'site-images');

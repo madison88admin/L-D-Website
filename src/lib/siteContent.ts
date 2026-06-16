@@ -17,7 +17,12 @@ function readLocalContent<T>(key: string, fallback: T) {
 
 function writeLocalContent<T>(key: string, content: T) {
   if (typeof window === 'undefined') return;
-  window.localStorage.setItem(key, JSON.stringify(content));
+
+  try {
+    window.localStorage.setItem(key, JSON.stringify(content));
+  } catch {
+    // Supabase is the source of truth. Local cache can fail when image data is large.
+  }
 }
 
 export async function loadSiteContent<T>(
@@ -44,9 +49,8 @@ export async function loadSiteContent<T>(
 }
 
 export async function saveSiteContent<T>(key: string, content: T) {
-  writeLocalContent(key, content);
-
   if (!supabase) {
+    writeLocalContent(key, content);
     throw new Error('Supabase is not configured.');
   }
 
@@ -59,11 +63,11 @@ export async function saveSiteContent<T>(key: string, content: T) {
         updated_at: new Date().toISOString(),
       },
       { onConflict: 'key' },
-    )
-    .select('key')
-    .single();
+    );
 
   if (error) {
     throw error;
   }
+
+  writeLocalContent(key, content);
 }

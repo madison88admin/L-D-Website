@@ -1,5 +1,6 @@
 import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useState } from 'react';
+import { uploadImageToStorage } from '../lib/imageStorage';
 import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 type TeamMember = {
@@ -39,6 +40,7 @@ type AboutPageContent = {
   excellenceTitle: string;
   excellenceParagraph: string;
   isExcellenceHidden?: boolean;
+  aboutSectionOrder?: AboutSectionId[];
   sections: AboutPageSection[];
 };
 
@@ -47,6 +49,8 @@ type AboutPageSection = {
   paragraph: string;
   image: string;
 };
+
+type AboutSectionId = 'about' | 'excellence' | 'additional';
 
 const aboutPageStorageKey = 'madison88-about-page-content';
 const teamStorageKey = 'madison88-team-content';
@@ -146,30 +150,25 @@ const defaultAboutPageContent: AboutPageContent = {
   excellenceParagraph:
     "At Madison 88 Center for Excellence, our mission is to empower employees with the skills and mindset needed to thrive in an ever-evolving business landscape. We aim to upskill and future-proof our workforce, fostering innovation and adaptability not only within the industries we serve but also in each individual's personal career journey. Through continuous learning, cutting-edge training, and a culture of growth, we prepare our people to lead with confidence, embrace change, and unlock their full potential.",
   isExcellenceHidden: false,
+  aboutSectionOrder: ['about', 'excellence', 'additional'],
   sections: [],
 };
 
 function normalizeHrMembers(members: TeamMember[] | undefined) {
   if (!members?.length) return defaultTeamContent.hrMembers;
 
-  const savedByName = new Map(members.map((member) => [member.name, member]));
-  const legacyNames = new Set([
-    ...defaultTeamContent.hrMembers.map((member) => member.name),
-    'Weng',
-  ]);
-  const extraMembers = members.filter((member) => !legacyNames.has(member.name));
+  const defaultByName = new Map(defaultTeamContent.hrMembers.map((member) => [member.name, member]));
+  const savedNames = new Set(members.map((member) => member.name));
+  const normalizedSavedMembers = members
+    .filter((member) => member.name !== 'Weng')
+    .map((member) => ({
+      ...defaultByName.get(member.name),
+      ...member,
+      initials: getMemberInitials(member.name),
+    }));
+  const missingDefaultMembers = defaultTeamContent.hrMembers.filter((member) => !savedNames.has(member.name));
 
-  return [
-    ...defaultTeamContent.hrMembers.map((defaultMember) => {
-      const savedMember = savedByName.get(defaultMember.name);
-      return {
-        ...defaultMember,
-        image: savedMember?.image || defaultMember.image,
-        initials: savedMember?.initials || defaultMember.initials,
-      };
-    }),
-    ...extraMembers,
-  ];
+  return [...normalizedSavedMembers, ...missingDefaultMembers];
 }
 
 function normalizeTeamContent(content: Partial<TeamContent>): TeamContent {
@@ -239,62 +238,25 @@ function loadAboutPageContent() {
 }
 
 function normalizeAboutPageContent(content: Partial<AboutPageContent>): AboutPageContent {
+  const defaultOrder = defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+  const savedOrder = content.aboutSectionOrder || [];
+  const aboutSectionOrder = [
+    ...savedOrder.filter((sectionId): sectionId is AboutSectionId => defaultOrder.includes(sectionId as AboutSectionId)),
+    ...defaultOrder.filter((sectionId) => !savedOrder.includes(sectionId)),
+  ];
+
   return {
     ...defaultAboutPageContent,
     ...content,
     isAboutHidden: Boolean(content.isAboutHidden),
     isExcellenceHidden: Boolean(content.isExcellenceHidden),
+    aboutSectionOrder,
     sections: content.sections || [],
   };
 }
 
 async function saveAboutPageContent(content: AboutPageContent) {
   await saveSiteContent(aboutPageStorageKey, content);
-}
-
-function resizeImageForStorage(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const image = new Image();
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to read image file.'));
-        return;
-      }
-
-      image.src = reader.result;
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Unable to read image file.'));
-    };
-
-    image.onload = () => {
-      const maxSize = 640;
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.round(image.width * scale);
-      const height = Math.round(image.height * scale);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Unable to prepare image.'));
-        return;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
-    };
-
-    image.onerror = () => {
-      reject(new Error('Unable to load image file.'));
-    };
-
-    reader.readAsDataURL(file);
-  });
 }
 
 function getBlankMember(): TeamMember {
@@ -315,6 +277,11 @@ function getBlankAboutSection(): AboutPageSection {
   };
 }
 
+function getMemberInitials(name: string) {
+  const letters = name.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase();
+  return letters || 'NA';
+}
+
 function renderMemberPhoto(member: TeamMember) {
   return (
     <>
@@ -327,7 +294,7 @@ function renderMemberPhoto(member: TeamMember) {
           }}
         />
       )}
-      <span>{member.initials}</span>
+      <span>{getMemberInitials(member.name)}</span>
     </>
   );
 }
@@ -343,6 +310,7 @@ function AboutUs() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -393,6 +361,7 @@ function AboutUs() {
   };
 
   const handleTeamSave = async () => {
+    setIsSaving(true);
     try {
       await saveTeamContent(draftTeamContent);
       setTeamContent(draftTeamContent);
@@ -400,10 +369,13 @@ function AboutUs() {
       setIsAdminOpen(false);
     } catch {
       setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleAboutPageSave = async () => {
+    setIsSaving(true);
     try {
       await saveAboutPageContent(draftAboutPageContent);
       setAboutPageContent(draftAboutPageContent);
@@ -411,6 +383,8 @@ function AboutUs() {
       setIsAboutAdminOpen(false);
     } catch {
       setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -461,6 +435,42 @@ function AboutUs() {
 
   const deleteAboutSectionImage = (index: number) => {
     updateAboutSection(index, 'image', '');
+  };
+
+  const moveAboutSection = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftAboutPageContent((content) => {
+      if (toIndex >= content.sections.length) return content;
+
+      const nextSections = [...content.sections];
+      const [movedSection] = nextSections.splice(fromIndex, 1);
+      nextSections.splice(toIndex, 0, movedSection);
+
+      return {
+        ...content,
+        sections: nextSections,
+      };
+    });
+  };
+
+  const moveAboutSectionGroup = (sectionId: AboutSectionId, direction: -1 | 1) => {
+    setDraftAboutPageContent((content) => {
+      const currentOrder = content.aboutSectionOrder || defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+      const fromIndex = currentOrder.indexOf(sectionId);
+      const toIndex = fromIndex + direction;
+
+      if (fromIndex < 0 || toIndex < 0 || toIndex >= currentOrder.length) return content;
+
+      const nextOrder = [...currentOrder];
+      const [movedSection] = nextOrder.splice(fromIndex, 1);
+      nextOrder.splice(toIndex, 0, movedSection);
+
+      return {
+        ...content,
+        aboutSectionOrder: nextOrder,
+      };
+    });
   };
 
   const updateSectionHeading = (field: keyof TeamContent['heading'], value: string) => {
@@ -527,29 +537,57 @@ function AboutUs() {
     updateTeamMember(group, index, 'image', '');
   };
 
+  const moveTeamMember = (group: 'hrMembers' | 'contributors', fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftTeamContent((content) => {
+      if (toIndex >= content[group].length) return content;
+
+      const nextMembers = [...content[group]];
+      const [movedMember] = nextMembers.splice(fromIndex, 1);
+      nextMembers.splice(toIndex, 0, movedMember);
+
+      return {
+        ...content,
+        [group]: nextMembers,
+      };
+    });
+  };
+
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>,
     updateImage: (image: string) => void,
+    folder = 'about',
   ) => {
     const file = event.target.files?.[0];
+    const input = event.currentTarget;
 
     if (!file) {
       return;
     }
 
     try {
-      const resizedImage = await resizeImageForStorage(file);
-      updateImage(resizedImage);
+      const imageUrl = await uploadImageToStorage(file, folder);
+      updateImage(imageUrl);
       setSaveError('');
     } catch {
       setSaveError('Image upload failed. Please try a different image.');
+    } finally {
+      input.value = '';
     }
   };
 
-  return (
-    <div className="home-page">
-      {!aboutPageContent.isAboutHidden && (
-        <section className="home-about">
+  const visibleAboutSectionOrder =
+    aboutPageContent.aboutSectionOrder || defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+  const draftAboutSectionOrder =
+    draftAboutPageContent.aboutSectionOrder || defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+
+  const renderAboutContentSection = (sectionId: AboutSectionId) => {
+    if (sectionId === 'about') {
+      if (aboutPageContent.isAboutHidden) return null;
+
+      return (
+        <section className="home-about" key="about-section">
           <div className="section-inner about-grid">
             <div className="about-image-card" aria-label="Madison88 learning session">
               {aboutPageContent.aboutImage && (
@@ -578,10 +616,14 @@ function AboutUs() {
             </div>
           </div>
         </section>
-      )}
+      );
+    }
 
-      {!aboutPageContent.isExcellenceHidden && (
-        <section className="excellence-section">
+    if (sectionId === 'excellence') {
+      if (aboutPageContent.isExcellenceHidden) return null;
+
+      return (
+        <section className="excellence-section" key="excellence-section">
           <div className="section-inner excellence-content">
             <h2
               onClick={(event) => {
@@ -596,41 +638,47 @@ function AboutUs() {
             <p>{aboutPageContent.excellenceParagraph}</p>
           </div>
         </section>
-      )}
+      );
+    }
 
-      {aboutPageContent.sections.map((section, index) => (
-        <section
-          className={`about-extra-section${section.image ? '' : ' about-extra-section-no-image'}`}
-          key={`${section.title}-${index}`}
-        >
-          <div className="section-inner about-extra-grid">
-            {section.image && (
-              <div className="about-extra-image-card">
-                <img
-                  src={section.image}
-                  alt={section.title}
-                  onError={(event) => {
-                    event.currentTarget.style.display = 'none';
-                  }}
-                />
-              </div>
-            )}
-            <div className="about-copy">
-              <h2
-                onClick={(event) => {
-                  if (event.detail === 3) {
-                    openAboutEditor();
-                  }
+    return aboutPageContent.sections.map((section, index) => (
+      <section
+        className={`about-extra-section${section.image ? '' : ' about-extra-section-no-image'}`}
+        key={`${section.title}-${index}`}
+      >
+        <div className="section-inner about-extra-grid">
+          {section.image && (
+            <div className="about-extra-image-card">
+              <img
+                src={section.image}
+                alt={section.title}
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
                 }}
-                style={{ cursor: 'default', userSelect: 'none' }}
-              >
-                {section.title}
-              </h2>
-              <p>{section.paragraph}</p>
+              />
             </div>
+          )}
+          <div className="about-copy">
+            <h2
+              onClick={(event) => {
+                if (event.detail === 3) {
+                  openAboutEditor();
+                }
+              }}
+              style={{ cursor: 'default', userSelect: 'none' }}
+            >
+              {section.title}
+            </h2>
+            <p>{section.paragraph}</p>
           </div>
-        </section>
-      ))}
+        </div>
+      </section>
+    ));
+  };
+
+  return (
+    <div className="home-page">
+      {visibleAboutSectionOrder.map((sectionId) => renderAboutContentSection(sectionId))}
 
       <section className="specialists-section">
         <div className="section-inner">
@@ -782,7 +830,27 @@ function AboutUs() {
               <div className="hr-admin-editor">
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>About Section</h3>
+                    <div className="hr-admin-heading-group">
+                      <h3>About Section</h3>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder About section">
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('about', -1)}
+                          disabled={draftAboutSectionOrder.indexOf('about') === 0}
+                          aria-label="Move About section up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('about', 1)}
+                          disabled={draftAboutSectionOrder.indexOf('about') === draftAboutSectionOrder.length - 1}
+                          aria-label="Move About section down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
                     <button
                       className={draftAboutPageContent.isAboutHidden ? 'hr-admin-small-action' : 'hr-admin-delete'}
                       type="button"
@@ -827,7 +895,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateAboutPageContent('aboutImage', image);
-                            });
+                            }, 'about/main');
                           }}
                         />
                         <label className="hr-admin-file-button" htmlFor="about-page-image-upload">
@@ -853,7 +921,27 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>Center for Excellence Section</h3>
+                    <div className="hr-admin-heading-group">
+                      <h3>Center for Excellence Section</h3>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder Center for Excellence section">
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('excellence', -1)}
+                          disabled={draftAboutSectionOrder.indexOf('excellence') === 0}
+                          aria-label="Move Center for Excellence section up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('excellence', 1)}
+                          disabled={draftAboutSectionOrder.indexOf('excellence') === draftAboutSectionOrder.length - 1}
+                          aria-label="Move Center for Excellence section down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
                     <button
                       className={draftAboutPageContent.isExcellenceHidden ? 'hr-admin-small-action' : 'hr-admin-delete'}
                       type="button"
@@ -888,7 +976,27 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>Additional Sections</h3>
+                    <div className="hr-admin-heading-group">
+                      <h3>Additional Sections</h3>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder additional sections group">
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('additional', -1)}
+                          disabled={draftAboutSectionOrder.indexOf('additional') === 0}
+                          aria-label="Move Additional Sections up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('additional', 1)}
+                          disabled={draftAboutSectionOrder.indexOf('additional') === draftAboutSectionOrder.length - 1}
+                          aria-label="Move Additional Sections down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
                     <button className="hr-admin-small-action" type="button" onClick={addAboutSection}>
                       Add Section
                     </button>
@@ -912,6 +1020,24 @@ function AboutUs() {
                         </div>
 
                         <div className="featured-course-admin-fields">
+                          <div className="hr-admin-reorder-controls" aria-label="Reorder about section">
+                            <button
+                              type="button"
+                              onClick={() => moveAboutSection(index, index - 1)}
+                              disabled={index === 0}
+                              aria-label={`Move ${section.title} up`}
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveAboutSection(index, index + 1)}
+                              disabled={index === draftAboutPageContent.sections.length - 1}
+                              aria-label={`Move ${section.title} down`}
+                            >
+                              ▼
+                            </button>
+                          </div>
                           <label>
                             Title
                             <input
@@ -944,7 +1070,7 @@ function AboutUs() {
                                 onChange={(event) => {
                                   handleImageUpload(event, (image) => {
                                     updateAboutSection(index, 'image', image);
-                                  });
+                                  }, 'about/sections');
                                 }}
                               />
                               <span className="hr-admin-file-button">Choose File</span>
@@ -985,8 +1111,8 @@ function AboutUs() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleAboutPageSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleAboutPageSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1134,7 +1260,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateSpecialist('image', image);
-                            });
+                            }, 'about/team');
                           }}
                         />
                         <label
@@ -1245,6 +1371,24 @@ function AboutUs() {
                   </div>
                   {draftTeamContent.hrMembers.map((member, index) => (
                     <div className="hr-admin-member-row" key={`about-hr-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder HR member">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index + 1)}
+                          disabled={index === draftTeamContent.hrMembers.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">{renderMemberPhoto(member)}</div>
                         <input
@@ -1256,7 +1400,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('hrMembers', index, 'image', image);
-                            });
+                            }, 'about/hr-members');
                           }}
                         />
                         <label
@@ -1334,6 +1478,24 @@ function AboutUs() {
                   </div>
                   {draftTeamContent.contributors.map((member, index) => (
                     <div className="hr-admin-member-row" key={`about-contributor-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder contributor">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index + 1)}
+                          disabled={index === draftTeamContent.contributors.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">{renderMemberPhoto(member)}</div>
                         <input
@@ -1345,7 +1507,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('contributors', index, 'image', image);
-                            });
+                            }, 'about/contributors');
                           }}
                         />
                         <label
@@ -1412,8 +1574,8 @@ function AboutUs() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>

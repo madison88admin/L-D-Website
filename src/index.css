@@ -1485,6 +1485,14 @@ a {
   gap: 16px;
 }
 
+.hr-admin-heading-group {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
 .hr-admin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1535,6 +1543,52 @@ a {
 
 .hr-admin-member-row > * {
   min-width: 0;
+}
+
+.hr-admin-reorder-controls {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.hr-admin-reorder-controls button {
+  width: 38px;
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid #c7d8e6;
+  border-radius: 999px;
+  background: linear-gradient(180deg, #ffffff, #eef6fc);
+  color: #123d63;
+  font-size: 1.08rem;
+  font-weight: 900;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: 0 8px 18px rgb(18 61 99 / 0.08);
+  transition:
+    border-color 160ms ease,
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease,
+    transform 160ms ease;
+}
+
+.hr-admin-reorder-controls button:hover:not(:disabled) {
+  border-color: #0f5f9b;
+  background: #123d63;
+  color: #ffffff;
+  box-shadow: 0 12px 24px rgb(18 61 99 / 0.18);
+  transform: translateY(-1px);
+}
+
+.hr-admin-reorder-controls button:disabled {
+  background: #f3f7fa;
+  color: #9db0c0;
+  box-shadow: none;
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .hr-admin-photo-editor {
@@ -1717,6 +1771,15 @@ a {
   color: #ffffff;
   box-shadow: 0 10px 24px rgb(180 35 24 / 0.22);
   transform: translateY(-1px);
+}
+
+.hr-admin-actions button:disabled,
+.hr-admin-primary:disabled,
+.hr-admin-small-action:disabled {
+  opacity: 0.62;
+  cursor: wait;
+  box-shadow: none;
+  transform: none;
 }
 
 .hr-admin-actions button:focus-visible,

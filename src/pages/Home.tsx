@@ -2,6 +2,7 @@ import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { getLinkThumbnail, getProgramThumbnail, legacyProgramTitles, programs, type Program } from '../data/programs';
+import { uploadImageToStorage } from '../lib/imageStorage';
 import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 const programsStorageKey = 'madison88-program-content';
@@ -12,38 +13,48 @@ function loadPrograms(): Program[] {
     const saved = window.localStorage.getItem(programsStorageKey);
     if (!saved) return programs;
     const parsed = JSON.parse(saved) as Program[];
-    const merged = programs
-      .map((p) => {
-        const saved = parsed.find((s) => s.slug === p.slug);
-        const mergedProgram = { ...p, ...saved, detail: { ...p.detail, ...saved?.detail } };
-        if (saved?.title && legacyProgramTitles[p.slug]?.includes(saved.title)) {
-          mergedProgram.title = p.title;
+    if (!parsed.length) return programs;
+    return parsed
+      .filter((s) => !(s.title === 'New Program' && !s.image && !s.link))
+      .map((s) => {
+        const defaultProgram = programs.find((p) => p.slug === s.slug);
+        const mergedProgram = {
+          ...defaultProgram,
+          ...s,
+          detail: {
+            ...defaultProgram?.detail,
+            ...s.detail,
+          },
+        } as Program;
+        if (defaultProgram && s.title && legacyProgramTitles[s.slug]?.includes(s.title)) {
+          mergedProgram.title = defaultProgram.title;
         }
         return mergedProgram;
       });
-    const added = parsed.filter(
-      (s) => !programs.some((p) => p.slug === s.slug) && !(s.title === 'New Program' && !s.image && !s.link),
-    );
-    return [...merged, ...added];
   } catch {
     return programs;
   }
 }
 
 function normalizePrograms(content: Program[]) {
-  const merged = programs
-    .map((p) => {
-      const saved = content.find((s) => s.slug === p.slug);
-      const mergedProgram = { ...p, ...saved, detail: { ...p.detail, ...saved?.detail } };
-      if (saved?.title && legacyProgramTitles[p.slug]?.includes(saved.title)) {
-        mergedProgram.title = p.title;
+  if (!content.length) return programs;
+  return content
+    .filter((s) => !(s.title === 'New Program' && !s.image && !s.link))
+    .map((s) => {
+      const defaultProgram = programs.find((p) => p.slug === s.slug);
+      const mergedProgram = {
+        ...defaultProgram,
+        ...s,
+        detail: {
+          ...defaultProgram?.detail,
+          ...s.detail,
+        },
+      } as Program;
+      if (defaultProgram && s.title && legacyProgramTitles[s.slug]?.includes(s.title)) {
+        mergedProgram.title = defaultProgram.title;
       }
       return mergedProgram;
     });
-  const added = content.filter(
-    (s) => !programs.some((p) => p.slug === s.slug) && !(s.title === 'New Program' && !s.image && !s.link),
-  );
-  return [...merged, ...added];
 }
 
 type ProgramPreviewStyle = CSSProperties & {
@@ -295,24 +306,18 @@ const specialistMantra =
 function normalizeHrMembers(members: TeamMember[] | undefined) {
   if (!members?.length) return defaultTeamContent.hrMembers;
 
-  const savedByName = new Map(members.map((member) => [member.name, member]));
-  const legacyNames = new Set([
-    ...defaultTeamContent.hrMembers.map((member) => member.name),
-    'Weng',
-  ]);
-  const extraMembers = members.filter((member) => !legacyNames.has(member.name));
+  const defaultByName = new Map(defaultTeamContent.hrMembers.map((member) => [member.name, member]));
+  const savedNames = new Set(members.map((member) => member.name));
+  const normalizedSavedMembers = members
+    .filter((member) => member.name !== 'Weng')
+    .map((member) => ({
+      ...defaultByName.get(member.name),
+      ...member,
+      initials: getMemberInitials(member.name),
+    }));
+  const missingDefaultMembers = defaultTeamContent.hrMembers.filter((member) => !savedNames.has(member.name));
 
-  return [
-    ...defaultTeamContent.hrMembers.map((defaultMember) => {
-      const savedMember = savedByName.get(defaultMember.name);
-      return {
-        ...defaultMember,
-        image: savedMember?.image || defaultMember.image,
-        initials: savedMember?.initials || defaultMember.initials,
-      };
-    }),
-    ...extraMembers,
-  ];
+  return [...normalizedSavedMembers, ...missingDefaultMembers];
 }
 
 function normalizeTeamContent(content: Partial<TeamContent>): TeamContent {
@@ -445,51 +450,6 @@ async function saveHomeHeroContent(content: HomeHeroContent) {
   await saveSiteContent(homeHeroStorageKey, content);
 }
 
-function resizeImageForStorage(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const image = new Image();
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to read image file.'));
-        return;
-      }
-
-      image.src = reader.result;
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Unable to read image file.'));
-    };
-
-    image.onload = () => {
-      const maxSize = 640;
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.round(image.width * scale);
-      const height = Math.round(image.height * scale);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Unable to prepare image.'));
-        return;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
-    };
-
-    image.onerror = () => {
-      reject(new Error('Unable to load image file.'));
-    };
-
-    reader.readAsDataURL(file);
-  });
-}
-
 function readFileForStorage(file: File) {
   return new Promise<string>((resolve, reject) => {
     const reader = new FileReader();
@@ -531,6 +491,11 @@ function getBlankFeaturedCourseCard(): FeaturedCourseCard {
     column: 'copilot',
   };
 }
+
+function getMemberInitials(name: string) {
+  const letters = name.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase();
+  return letters || 'NA';
+}
  
 function Home() {
   const [homeHeroContent, setHomeHeroContent] = useState(loadHomeHeroContent);
@@ -550,6 +515,7 @@ function Home() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
@@ -629,6 +595,7 @@ function Home() {
   const saveFeatured = async () => {
     const validFeaturedSlugs = getValidFeaturedSlugs(draftFeaturedSlugs, allPrograms);
 
+    setIsSaving(true);
     try {
       await saveFeaturedSlugs(validFeaturedSlugs);
       setFeaturedSlugs(validFeaturedSlugs);
@@ -637,6 +604,8 @@ function Home() {
       setIsFeaturedAdminOpen(false);
     } catch {
       setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -658,6 +627,7 @@ function Home() {
   };
 
   const handleTeamSave = async () => {
+    setIsSaving(true);
     try {
       await saveTeamContent(draftTeamContent);
       setTeamContent(draftTeamContent);
@@ -665,10 +635,13 @@ function Home() {
       setIsAdminOpen(false);
     } catch {
       setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleFeaturedCoursesSave = async () => {
+    setIsSaving(true);
     try {
       await saveFeaturedCoursesContent(draftFeaturedCoursesContent);
       setFeaturedCoursesContent(draftFeaturedCoursesContent);
@@ -676,10 +649,13 @@ function Home() {
       setIsFeaturedCoursesAdminOpen(false);
     } catch {
       setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
   const handleHeroSave = async () => {
+    setIsSaving(true);
     try {
       await saveHomeHeroContent(draftHomeHeroContent);
       setHomeHeroContent(draftHomeHeroContent);
@@ -687,6 +663,8 @@ function Home() {
       setIsHeroAdminOpen(false);
     } catch {
       setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -744,6 +722,23 @@ function Home() {
 
   const deleteFeaturedCourseImage = (index: number) => {
     updateFeaturedCourseCard(index, 'image', '');
+  };
+
+  const moveFeaturedCourseCard = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftFeaturedCoursesContent((content) => {
+      if (toIndex >= content.cards.length) return content;
+
+      const nextCards = [...content.cards];
+      const [movedCard] = nextCards.splice(fromIndex, 1);
+      nextCards.splice(toIndex, 0, movedCard);
+
+      return {
+        ...content,
+        cards: nextCards,
+      };
+    });
   };
 
   const updateSpecialist = (field: keyof TeamContent['specialist'], value: string) => {
@@ -810,22 +805,43 @@ function Home() {
     updateTeamMember(group, index, 'image', '');
   };
 
+  const moveTeamMember = (group: 'hrMembers' | 'contributors', fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftTeamContent((content) => {
+      if (toIndex >= content[group].length) return content;
+
+      const nextMembers = [...content[group]];
+      const [movedMember] = nextMembers.splice(fromIndex, 1);
+      nextMembers.splice(toIndex, 0, movedMember);
+
+      return {
+        ...content,
+        [group]: nextMembers,
+      };
+    });
+  };
+
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>,
     updateImage: (image: string) => void,
+    folder = 'home',
   ) => {
     const file = event.target.files?.[0];
+    const input = event.currentTarget;
 
     if (!file) {
       return;
     }
 
     try {
-      const resizedImage = await resizeImageForStorage(file);
-      updateImage(resizedImage);
+      const imageUrl = await uploadImageToStorage(file, folder);
+      updateImage(imageUrl);
       setSaveError('');
     } catch {
       setSaveError('Image upload failed. Please try a different image.');
+    } finally {
+      input.value = '';
     }
   };
 
@@ -840,7 +856,7 @@ function Home() {
           }}
         />
       )}
-      <span>{member.initials}</span>
+      <span>{getMemberInitials(member.name)}</span>
     </>
   );
 
@@ -1246,7 +1262,7 @@ function Home() {
                             type="file"
                             accept="image/*"
                             onChange={(event) => {
-                              handleImageUpload(event, (image) => updateHomeHeroContent('logo', image));
+                              handleImageUpload(event, (image) => updateHomeHeroContent('logo', image), 'home/hero');
                             }}
                           />
                           <span className="hr-admin-file-button">Choose File</span>
@@ -1304,8 +1320,8 @@ function Home() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleHeroSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleHeroSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1447,6 +1463,24 @@ function Home() {
                           </div>
 
                           <div className="featured-course-admin-fields">
+                            <div className="hr-admin-reorder-controls" aria-label="Reorder course card">
+                              <button
+                                type="button"
+                                onClick={() => moveFeaturedCourseCard(index, index - 1)}
+                                disabled={index === 0}
+                                aria-label={`Move ${card.title} up`}
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveFeaturedCourseCard(index, index + 1)}
+                                disabled={index === draftFeaturedCoursesContent.cards.length - 1}
+                                aria-label={`Move ${card.title} down`}
+                              >
+                                ▼
+                              </button>
+                            </div>
                             <div className="hr-admin-grid">
                               <label>
                                 Title
@@ -1505,7 +1539,7 @@ function Home() {
                                   onChange={(event) => {
                                     handleImageUpload(event, (image) => {
                                       updateFeaturedCourseCard(index, 'image', image);
-                                    });
+                                    }, 'home/featured-courses');
                                   }}
                                 />
                                 <span className="hr-admin-file-button">Choose File</span>
@@ -1543,8 +1577,8 @@ function Home() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleFeaturedCoursesSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleFeaturedCoursesSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1629,8 +1663,8 @@ function Home() {
                   <button type="button" onClick={() => { setDraftFeaturedSlugs(featuredSlugs); setIsFeaturedAdminOpen(false); }}>
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={saveFeatured}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={saveFeatured} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1778,7 +1812,7 @@ function Home() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateSpecialist('image', image);
-                            });
+                            }, 'home/team');
                           }}
                         />
                         <label className="hr-admin-file-button" htmlFor="specialist-photo-upload">
@@ -1886,6 +1920,24 @@ function Home() {
                   </div>
                   {draftTeamContent.hrMembers.map((member, index) => (
                     <div className="hr-admin-member-row" key={`hr-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder HR member">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index + 1)}
+                          disabled={index === draftTeamContent.hrMembers.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">
                           {renderMemberPhoto(member)}
@@ -1899,7 +1951,7 @@ function Home() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('hrMembers', index, 'image', image);
-                            });
+                            }, 'home/hr-members');
                           }}
                         />
                         <label
@@ -1977,6 +2029,24 @@ function Home() {
                   </div>
                   {draftTeamContent.contributors.map((member, index) => (
                     <div className="hr-admin-member-row" key={`contributor-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder contributor">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index + 1)}
+                          disabled={index === draftTeamContent.contributors.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">
                           {renderMemberPhoto(member)}
@@ -1990,7 +2060,7 @@ function Home() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('contributors', index, 'image', image);
-                            });
+                            }, 'home/contributors');
                           }}
                         />
                         <label
@@ -2057,8 +2127,8 @@ function Home() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
