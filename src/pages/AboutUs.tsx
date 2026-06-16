@@ -35,8 +35,10 @@ type AboutPageContent = {
   aboutTitle: string;
   aboutParagraph: string;
   aboutImage: string;
+  isAboutHidden?: boolean;
   excellenceTitle: string;
   excellenceParagraph: string;
+  isExcellenceHidden?: boolean;
   sections: AboutPageSection[];
 };
 
@@ -139,9 +141,11 @@ const defaultAboutPageContent: AboutPageContent = {
   aboutParagraph:
     'A privately held outdoor accessories company with a primary office location in Denver, CO. We are a world-class design, development and manufacturing company that can help reimagine what your assortments can be.',
   aboutImage: '/images/about-person.png',
+  isAboutHidden: false,
   excellenceTitle: 'Madison 88 Center for Excellence',
   excellenceParagraph:
     "At Madison 88 Center for Excellence, our mission is to empower employees with the skills and mindset needed to thrive in an ever-evolving business landscape. We aim to upskill and future-proof our workforce, fostering innovation and adaptability not only within the industries we serve but also in each individual's personal career journey. Through continuous learning, cutting-edge training, and a culture of growth, we prepare our people to lead with confidence, embrace change, and unlock their full potential.",
+  isExcellenceHidden: false,
   sections: [],
 };
 
@@ -238,6 +242,8 @@ function normalizeAboutPageContent(content: Partial<AboutPageContent>): AboutPag
   return {
     ...defaultAboutPageContent,
     ...content,
+    isAboutHidden: Boolean(content.isAboutHidden),
+    isExcellenceHidden: Boolean(content.isExcellenceHidden),
     sections: content.sections || [],
   };
 }
@@ -419,6 +425,13 @@ function AboutUs() {
     updateAboutPageContent('aboutImage', '');
   };
 
+  const toggleBuiltInAboutSection = (field: 'isAboutHidden' | 'isExcellenceHidden', isHidden: boolean) => {
+    setDraftAboutPageContent((content) => ({
+      ...content,
+      [field]: isHidden,
+    }));
+  };
+
   const addAboutSection = () => {
     setDraftAboutPageContent((content) => ({
       ...content,
@@ -535,21 +548,41 @@ function AboutUs() {
 
   return (
     <div className="home-page">
-      <section className="home-about">
-        <div className="section-inner about-grid">
-          <div className="about-image-card" aria-label="Madison88 learning session">
-            {aboutPageContent.aboutImage && (
-              <img
-                src={aboutPageContent.aboutImage}
-                alt={aboutPageContent.aboutTitle}
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none';
-                }}
-              />
-            )}
-          </div>
+      {!aboutPageContent.isAboutHidden && (
+        <section className="home-about">
+          <div className="section-inner about-grid">
+            <div className="about-image-card" aria-label="Madison88 learning session">
+              {aboutPageContent.aboutImage && (
+                <img
+                  src={aboutPageContent.aboutImage}
+                  alt={aboutPageContent.aboutTitle}
+                  onError={(event) => {
+                    event.currentTarget.style.display = 'none';
+                  }}
+                />
+              )}
+            </div>
 
-          <div className="about-copy">
+            <div className="about-copy">
+              <h2
+                onClick={(event) => {
+                  if (event.detail === 3) {
+                    openAboutEditor();
+                  }
+                }}
+                style={{ cursor: 'default', userSelect: 'none' }}
+              >
+                {aboutPageContent.aboutTitle}
+              </h2>
+              <p>{aboutPageContent.aboutParagraph}</p>
+            </div>
+          </div>
+        </section>
+      )}
+
+      {!aboutPageContent.isExcellenceHidden && (
+        <section className="excellence-section">
+          <div className="section-inner excellence-content">
             <h2
               onClick={(event) => {
                 if (event.detail === 3) {
@@ -558,28 +591,12 @@ function AboutUs() {
               }}
               style={{ cursor: 'default', userSelect: 'none' }}
             >
-              {aboutPageContent.aboutTitle}
+              {aboutPageContent.excellenceTitle}
             </h2>
-            <p>{aboutPageContent.aboutParagraph}</p>
+            <p>{aboutPageContent.excellenceParagraph}</p>
           </div>
-        </div>
-      </section>
-
-      <section className="excellence-section">
-        <div className="section-inner excellence-content">
-          <h2
-            onClick={(event) => {
-              if (event.detail === 3) {
-                openAboutEditor();
-              }
-            }}
-            style={{ cursor: 'default', userSelect: 'none' }}
-          >
-            {aboutPageContent.excellenceTitle}
-          </h2>
-          <p>{aboutPageContent.excellenceParagraph}</p>
-        </div>
-      </section>
+        </section>
+      )}
 
       {aboutPageContent.sections.map((section, index) => (
         <section
@@ -764,7 +781,18 @@ function AboutUs() {
             ) : (
               <div className="hr-admin-editor">
                 <section className="hr-admin-editor-section">
-                  <h3>About Section</h3>
+                  <div className="hr-admin-section-heading">
+                    <h3>About Section</h3>
+                    <button
+                      className={draftAboutPageContent.isAboutHidden ? 'hr-admin-small-action' : 'hr-admin-delete'}
+                      type="button"
+                      onClick={() => {
+                        toggleBuiltInAboutSection('isAboutHidden', !draftAboutPageContent.isAboutHidden);
+                      }}
+                    >
+                      {draftAboutPageContent.isAboutHidden ? 'Restore Section' : 'Delete Section'}
+                    </button>
+                  </div>
                   <div className="hr-admin-grid">
                     <label>
                       Title
@@ -805,6 +833,9 @@ function AboutUs() {
                         <label className="hr-admin-file-button" htmlFor="about-page-image-upload">
                           Choose File
                         </label>
+                        <button className="hr-admin-delete" type="button" onClick={deleteAboutImage}>
+                          Delete Image
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -818,13 +849,21 @@ function AboutUs() {
                       }}
                     />
                   </label>
-                  <button className="hr-admin-delete" type="button" onClick={deleteAboutImage}>
-                    Delete Image
-                  </button>
                 </section>
 
                 <section className="hr-admin-editor-section">
-                  <h3>Center for Excellence Section</h3>
+                  <div className="hr-admin-section-heading">
+                    <h3>Center for Excellence Section</h3>
+                    <button
+                      className={draftAboutPageContent.isExcellenceHidden ? 'hr-admin-small-action' : 'hr-admin-delete'}
+                      type="button"
+                      onClick={() => {
+                        toggleBuiltInAboutSection('isExcellenceHidden', !draftAboutPageContent.isExcellenceHidden);
+                      }}
+                    >
+                      {draftAboutPageContent.isExcellenceHidden ? 'Restore Section' : 'Delete Section'}
+                    </button>
+                  </div>
                   <label>
                     Title
                     <input

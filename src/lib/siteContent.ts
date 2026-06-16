@@ -50,11 +50,18 @@ export async function saveSiteContent<T>(key: string, content: T) {
     throw new Error('Supabase is not configured.');
   }
 
-  const { error } = await supabase.from('site_content').upsert({
-    key,
-    content,
-    updated_at: new Date().toISOString(),
-  });
+  const { error } = await supabase
+    .from('site_content')
+    .upsert(
+      {
+        key,
+        content,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'key' },
+    )
+    .select('key')
+    .single();
 
   if (error) {
     throw error;

@@ -1217,14 +1217,15 @@ a {
   z-index: 80;
   display: grid;
   place-items: center;
-  padding: 24px;
+  padding: 16px;
   background: rgb(12 30 48 / 0.58);
 }
 
 .hr-admin-modal {
-  width: min(1120px, calc(100vw - 48px));
-  max-height: min(86vh, 860px);
-  overflow: auto;
+  width: min(1480px, calc(100vw - 32px));
+  max-height: min(90vh, 900px);
+  overflow-y: auto;
+  overflow-x: hidden;
   border-radius: 8px;
   background: #ffffff;
   box-shadow: 0 28px 80px rgb(0 14 32 / 0.28);
@@ -1272,6 +1273,7 @@ a {
 
 .hr-admin-login,
 .hr-admin-editor {
+  min-width: 0;
   padding: 28px;
 }
 
@@ -1392,16 +1394,19 @@ a {
 
 .featured-course-admin-card {
   display: grid;
-  grid-template-columns: minmax(140px, 0.32fr) minmax(0, 1fr);
+  grid-template-columns: 90px minmax(0, 1fr);
+  align-items: start;
   gap: 18px;
-  padding: 16px;
+  padding: 18px;
   border: 1px solid #dbe5ee;
   border-radius: 8px;
   background: #ffffff;
 }
 
 .featured-course-admin-preview {
-  min-height: 160px;
+  width: 90px;
+  min-height: 90px;
+  aspect-ratio: 1;
   display: grid;
   place-items: center;
   overflow: hidden;
@@ -1418,14 +1423,20 @@ a {
 .featured-course-admin-preview img {
   width: 100%;
   height: 100%;
-  min-height: 160px;
+  min-height: 90px;
   display: block;
   object-fit: cover;
 }
 
 .featured-course-admin-fields {
   display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+}
+
+.featured-course-admin-fields > label:has(textarea),
+.featured-course-admin-fields > .featured-course-admin-actions {
+  grid-column: 1 / -1;
 }
 
 .featured-course-admin-actions {
@@ -1435,6 +1446,15 @@ a {
   gap: 10px;
 }
 
+.featured-course-admin-actions label {
+  display: grid;
+  gap: 8px;
+}
+
+.featured-course-admin-actions .hr-admin-delete {
+  align-self: end;
+}
+
 .hr-admin-editor {
   display: grid;
   gap: 26px;
@@ -1442,7 +1462,9 @@ a {
 
 .hr-admin-editor-section {
   display: grid;
-  gap: 16px;
+  gap: 18px;
+  min-width: 0;
+  overflow: hidden;
   padding: 22px;
   border: 1px solid #dbe5ee;
   border-radius: 8px;
@@ -1467,24 +1489,24 @@ a {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 14px;
+  min-width: 0;
 }
 
 .hr-admin-member-header,
 .hr-admin-member-row {
   display: grid;
   grid-template-columns:
-    minmax(320px, 1.2fr)
-    minmax(140px, 0.72fr)
-    minmax(170px, 0.95fr)
-    minmax(220px, 1.15fr)
-    minmax(78px, max-content);
-  align-items: center;
+    minmax(150px, 0.75fr)
+    minmax(180px, 0.95fr)
+    minmax(220px, 1.2fr)
+    max-content;
+  align-items: end;
   gap: 12px;
 }
 
 .hr-admin-member-header {
-  margin-top: 2px;
-  padding: 0 8px;
+  margin-top: 0;
+  padding: 0 18px;
   color: #173c63;
   font-size: 0.74rem;
   font-weight: 900;
@@ -1493,18 +1515,36 @@ a {
   text-transform: uppercase;
 }
 
+.hr-admin-member-header span:first-child {
+  display: none;
+}
+
 .hr-admin-upload {
   display: grid;
-  grid-template-columns: 78px 112px 122px;
+  grid-template-columns: 78px 112px max-content;
   align-items: center;
   gap: 12px;
 }
 
+.hr-admin-member-row {
+  padding: 18px;
+  border: 1px solid #dbe5ee;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.hr-admin-member-row > * {
+  min-width: 0;
+}
+
 .hr-admin-photo-editor {
   display: grid;
-  grid-template-columns: 58px 112px 122px;
+  grid-template-columns: 58px 112px max-content;
   align-items: center;
   gap: 10px;
+  grid-column: 1 / -1;
+  width: max-content;
+  max-width: 100%;
   min-width: 0;
 }
 
@@ -1582,7 +1622,8 @@ a {
 }
 
 .hr-admin-file-button:hover,
-.hr-admin-file-input:focus + .hr-admin-file-button {
+.hr-admin-file-input:focus + .hr-admin-file-button,
+.hr-admin-file-input:focus-visible + .hr-admin-file-button {
   border-color: #0f5f9b;
   background: #e7f0f8;
   color: #0f5f9b;
@@ -1641,20 +1682,40 @@ a {
 }
 
 .hr-admin-delete {
+  --trash-icon: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='black' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='3 6 5 6 21 6'/%3E%3Cpath d='M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2'/%3E%3Cline x1='10' y1='11' x2='10' y2='17'/%3E%3Cline x1='14' y1='11' x2='14' y2='17'/%3E%3C/svg%3E");
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   min-height: 40px;
-  padding: 8px 12px;
-  background: #fff0ee;
+  align-self: center;
+  padding: 9px 16px;
+  border: 1.5px solid #e4b6b1;
+  border-radius: 10px;
+  background: #fff5f4;
   color: #b42318;
   font-size: 0.9rem;
-  line-height: 1.1;
+  font-weight: 700;
+  line-height: 1;
   white-space: nowrap;
-  width: fit-content;
+  width: max-content;
+}
+
+.hr-admin-delete::before {
+  content: "";
+  width: 14px;
+  height: 14px;
+  flex-shrink: 0;
+  background-color: currentColor;
+  -webkit-mask: var(--trash-icon) center / contain no-repeat;
+  mask: var(--trash-icon) center / contain no-repeat;
 }
 
 .hr-admin-delete:hover {
   background: #b42318;
+  border-color: #b42318;
   color: #ffffff;
-  box-shadow: 0 14px 28px rgb(180 35 24 / 0.18);
+  box-shadow: 0 10px 24px rgb(180 35 24 / 0.22);
   transform: translateY(-1px);
 }
 
@@ -1971,13 +2032,13 @@ a {
   display: grid;
   gap: 16px;
   padding: 18px;
-  border-bottom: 1px solid #dbe5ee;
-  border-radius: 12px;
-  background: rgb(255 255 255 / 0.72);
+  border: 1px solid #dbe5ee;
+  border-radius: 8px;
+  background: #ffffff;
 }
 
 .program-admin-card-block:last-child {
-  border-bottom: 0;
+  border-bottom: 1px solid #dbe5ee;
 }
 
 .program-admin-detail-dropdown {
@@ -2136,6 +2197,7 @@ a {
 }
 
 .program-admin-preview {
+  width: 90px;
   aspect-ratio: 1;
   display: grid;
   place-items: center;
@@ -2161,20 +2223,29 @@ a {
   .hr-admin-member-header,
   .hr-admin-member-row {
     grid-template-columns:
-      minmax(294px, 1.18fr)
-      minmax(140px, 0.82fr)
-      minmax(170px, 1fr)
-      minmax(210px, 1.18fr)
-      minmax(78px, max-content);
-  }
-
-  .hr-admin-photo-editor {
-    grid-template-columns: 58px 112px;
+      minmax(150px, 0.75fr)
+      minmax(180px, 0.95fr)
+      minmax(220px, 1.2fr)
+      max-content;
   }
 
   .hr-admin-photo-editor .hr-admin-delete {
-    grid-column: 2;
     width: fit-content;
+  }
+}
+
+@media (max-width: 980px) {
+  .hr-admin-member-header {
+    display: none;
+  }
+
+  .hr-admin-member-row {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .hr-admin-photo-editor {
+    grid-column: 1 / -1;
+    width: max-content;
   }
 }
 
@@ -2528,6 +2599,7 @@ a {
 
   .hr-admin-modal {
     width: min(100%, calc(100vw - 24px));
+    overflow-x: hidden;
   }
 
   .hr-admin-header,

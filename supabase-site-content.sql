@@ -1,5 +1,15 @@
 -- Run this in Supabase Dashboard > SQL Editor.
 -- This creates one shared JSON content table for the website editors.
+--
+-- The website stores each editable area as a JSON row:
+-- - madison88-home-hero-content: home hero text/media
+-- - madison88-program-content: program cards and program detail content
+-- - madison88-featured-programs: selected home featured program slugs
+-- - madison88-featured-courses-content: featured course cards, links, images, and text
+-- - madison88-about-page-content: about page text, images, extra sections, hidden section flags
+-- - madison88-team-content: L&D specialist, HR members, contributors, images, and profile text
+--
+-- Add/delete/edit actions in the admin UI update these JSON rows with upsert.
 
 create table if not exists public.site_content (
   key text primary key,
@@ -36,3 +46,21 @@ for update
 to anon, authenticated
 using (true)
 with check (true);
+
+-- Starter rows keep each editor key present with the correct JSON type.
+-- Existing saved content is preserved.
+insert into public.site_content (key, content)
+values
+  ('madison88-home-hero-content', '{}'::jsonb),
+  ('madison88-program-content', '[]'::jsonb),
+  ('madison88-featured-programs', '[]'::jsonb),
+  ('madison88-featured-courses-content', '{}'::jsonb),
+  (
+    'madison88-about-page-content',
+    '{"isAboutHidden": false, "isExcellenceHidden": false, "sections": []}'::jsonb
+  ),
+  ('madison88-team-content', '{}'::jsonb)
+on conflict (key) do nothing;
+
+-- Ask Supabase/PostgREST to refresh its schema cache after creating the table.
+notify pgrst, 'reload schema';
