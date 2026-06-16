@@ -18,6 +18,7 @@ body {
   margin: 0;
   min-width: 320px;
   min-height: 100vh;
+  overflow-y: scroll;
 }
 
 a {
@@ -35,6 +36,7 @@ a {
   justify-content: space-between;
   gap: 24px;
   width: 100%;
+  min-height: 72px;
   padding: 18px clamp(24px, 4.5vw, 80px);
   background: #ffffff;
   border-bottom: 1px solid #dbe3ea;
@@ -47,9 +49,12 @@ a {
   position: absolute;
   background: transparent;
   border-bottom: 0;
+  padding-top: clamp(12px, 2vh, 18px);
+  padding-bottom: clamp(12px, 2vh, 18px);
 }
 
 .brand {
+  flex: 0 0 auto;
   display: inline-flex;
   align-items: center;
   gap: 12px;
@@ -78,16 +83,29 @@ a {
 }
 
 .site-nav {
+  flex: 1 1 auto;
   display: flex;
   align-items: center;
+  justify-content: flex-end;
   gap: 12px;
 }
 
 .site-nav a {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 112px;
+  min-height: 42px;
   padding: 12px 18px;
   border-radius: 8px;
   color: #25445f;
   font-weight: 800;
+  text-align: center;
+  line-height: 1;
+  transition:
+    background 160ms ease,
+    color 160ms ease,
+    box-shadow 160ms ease;
 }
 
 .site-nav a.active,
@@ -149,10 +167,10 @@ a {
 }
 
 .home-hero {
-  min-height: 100vh;
+  min-height: 100svh;
   display: grid;
   place-items: center;
-  padding: 126px 24px 82px;
+  padding: clamp(92px, 12vh, 126px) 24px clamp(48px, 8vh, 82px);
   color: #ffffff;
   text-align: center;
   background:
@@ -192,13 +210,14 @@ a {
   width: min(1080px, 100%);
   position: relative;
   z-index: 3;
+  transform: translateY(clamp(-18px, -2vh, 0px));
 }
 
 .hero-logo {
   display: block;
-  width: min(620px, 78vw);
+  width: min(540px, 68vw);
   height: auto;
-  margin: 0 auto clamp(18px, 2.6vw, 34px);
+  margin: 0 auto clamp(14px, 2.4vh, 28px);
   object-fit: contain;
   filter: drop-shadow(0 14px 34px rgb(0 18 36 / 0.28));
 }
@@ -213,7 +232,7 @@ a {
 
 .hero-content h1 {
   margin: 0;
-  font-size: clamp(2.8rem, 5.3vw, 5.8rem);
+  font-size: clamp(2.6rem, 4.9vw, 5.15rem);
   font-weight: 900;
   line-height: 0.96;
   letter-spacing: 0;
@@ -227,7 +246,7 @@ a {
 
 .hero-content p {
   width: fit-content;
-  margin: clamp(16px, 2vw, 26px) auto 0;
+  margin: clamp(12px, 2vh, 22px) auto 0;
   padding-left: clamp(18px, 3.2vw, 46px);
   padding-right: clamp(18px, 3.2vw, 46px);
   font-family: "Trebuchet MS", "Segoe UI", ui-sans-serif, sans-serif;
@@ -239,6 +258,43 @@ a {
   text-shadow: 0 10px 28px rgb(0 18 36 / 0.34);
   opacity: 0.96;
   position: relative;
+}
+
+@media (min-width: 681px) and (max-height: 780px) {
+  .home-shell .site-header {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .brand {
+    min-height: 38px;
+    font-size: 1rem;
+  }
+
+  .site-nav a {
+    padding-top: 10px;
+    padding-bottom: 10px;
+  }
+
+  .home-hero {
+    padding-top: 82px;
+    padding-bottom: 38px;
+  }
+
+  .hero-logo {
+    width: min(500px, 58vw);
+    margin-bottom: 16px;
+  }
+
+  .hero-content h1 {
+    font-size: clamp(2.7rem, 4.55vw, 4.45rem);
+    line-height: 0.95;
+  }
+
+  .hero-content p {
+    margin-top: 14px;
+    font-size: clamp(0.94rem, 1.25vw, 1.16rem);
+  }
 }
 
 .hero-content p::before,
@@ -357,7 +413,7 @@ a {
 
 .careers-section {
   background: #ffffff;
-  padding: clamp(56px, 9vw, 112px) 0;
+  padding: clamp(42px, 7vw, 88px) 0 clamp(56px, 9vw, 112px);
 }
 
 .featured-courses-content {
@@ -385,7 +441,7 @@ a {
   margin-left: auto;
   padding: 0;
   color: #0f5f9b;
-  font-size: 0.86rem;
+  font-size: clamp(1.02rem, 1.5vw, 1.2rem);
   letter-spacing: 0.14em;
 }
 
@@ -405,7 +461,7 @@ a {
   align-items: center;
   width: 100%;
   max-width: none;
-  margin: 18px auto 0;
+  margin: clamp(44px, 6vw, 68px) auto 0;
   position: relative;
   text-wrap: balance;
 }
@@ -1166,7 +1222,7 @@ a {
 }
 
 .hr-admin-modal {
-  width: min(1120px, 100%);
+  width: min(1120px, calc(100vw - 48px));
   max-height: min(86vh, 860px);
   overflow: auto;
   border-radius: 8px;
@@ -1244,8 +1300,11 @@ a {
   border: 1px solid #cbd9e5;
   border-radius: 8px;
   padding: 10px 12px;
+  background: #ffffff;
   color: #172d44;
   font: inherit;
+  font-weight: 650;
+  line-height: 1.35;
   transition:
     border-color 160ms ease,
     box-shadow 160ms ease,
@@ -1264,6 +1323,7 @@ a {
 .hr-admin-editor textarea {
   min-height: 112px;
   resize: vertical;
+  line-height: 1.45;
 }
 
 .hr-admin-error {
@@ -1386,13 +1446,14 @@ a {
   padding: 22px;
   border: 1px solid #dbe5ee;
   border-radius: 8px;
-  background: #f7fafc;
+  background: #f7fbff;
 }
 
 .hr-admin-editor-section h3 {
   margin: 0;
   color: #173c63;
-  font-size: 1.1rem;
+  font-size: 1.12rem;
+  line-height: 1.2;
 }
 
 .hr-admin-section-heading {
@@ -1412,11 +1473,11 @@ a {
 .hr-admin-member-row {
   display: grid;
   grid-template-columns:
-    minmax(170px, 1.15fr)
-    minmax(120px, 0.8fr)
-    minmax(150px, 1fr)
-    minmax(180px, 1.35fr)
-    auto;
+    minmax(320px, 1.2fr)
+    minmax(140px, 0.72fr)
+    minmax(170px, 0.95fr)
+    minmax(220px, 1.15fr)
+    minmax(78px, max-content);
   align-items: center;
   gap: 12px;
 }
@@ -1434,16 +1495,17 @@ a {
 
 .hr-admin-upload {
   display: grid;
-  grid-template-columns: 78px 1fr;
+  grid-template-columns: 78px 112px 122px;
   align-items: center;
   gap: 12px;
 }
 
 .hr-admin-photo-editor {
   display: grid;
-  grid-template-columns: 58px 1fr;
+  grid-template-columns: 58px 112px 122px;
   align-items: center;
   gap: 10px;
+  min-width: 0;
 }
 
 .hr-admin-photo-preview {
@@ -1499,7 +1561,8 @@ a {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: fit-content;
+  width: 100%;
+  min-width: 112px;
   padding: 9px 14px;
   border: 1px solid #b8cbdc;
   border-radius: 8px;
@@ -1507,7 +1570,8 @@ a {
   color: #123d63;
   font-size: 0.86rem;
   font-weight: 800;
-  line-height: 1;
+  line-height: 1.12;
+  white-space: nowrap;
   cursor: pointer;
   transition:
     border-color 160ms ease,
@@ -1528,9 +1592,11 @@ a {
 
 .hr-admin-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-end;
   gap: 12px;
+  padding-top: 2px;
 }
 
 .hr-admin-actions button,
@@ -1579,6 +1645,10 @@ a {
   padding: 8px 12px;
   background: #fff0ee;
   color: #b42318;
+  font-size: 0.9rem;
+  line-height: 1.1;
+  white-space: nowrap;
+  width: fit-content;
 }
 
 .hr-admin-delete:hover {
@@ -1626,16 +1696,17 @@ a {
 }
 
 .programs-blue-field {
-  max-width: min(560px, 52vw);
+  max-width: min(860px, 74vw);
 }
 
 .programs-blue-field h1 {
   margin: 0;
   color: #ffffff;
-  font-size: clamp(2.4rem, 4.4vw, 4rem);
+  font-size: clamp(2.35rem, 4.2vw, 4rem);
   font-weight: 900;
-  line-height: 0.94;
+  line-height: 1;
   letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .programs-card-grid {
@@ -2086,6 +2157,117 @@ a {
   grid-area: 1 / 1;
 }
 
+@media (max-width: 1120px) {
+  .hr-admin-member-header,
+  .hr-admin-member-row {
+    grid-template-columns:
+      minmax(294px, 1.18fr)
+      minmax(140px, 0.82fr)
+      minmax(170px, 1fr)
+      minmax(210px, 1.18fr)
+      minmax(78px, max-content);
+  }
+
+  .hr-admin-photo-editor {
+    grid-template-columns: 58px 112px;
+  }
+
+  .hr-admin-photo-editor .hr-admin-delete {
+    grid-column: 2;
+    width: fit-content;
+  }
+}
+
+.resources-page {
+  min-height: calc(100vh - 83px);
+  display: grid;
+  place-items: center;
+  padding: clamp(56px, 8vw, 96px) clamp(20px, 5vw, 72px);
+  background: linear-gradient(90deg, #173c75 0 50%, #ffffff 50% 100%);
+  overflow: hidden;
+  position: relative;
+}
+
+.resources-page::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background:
+    linear-gradient(135deg, rgb(241 213 41 / 0.15), transparent 32%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.12), rgb(255 255 255 / 0));
+  pointer-events: none;
+}
+
+.resources-panel {
+  width: min(760px, 100%);
+  min-height: clamp(320px, 42vw, 460px);
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 20px;
+  padding: clamp(34px, 6vw, 64px);
+  border: 1px solid #d6e2eb;
+  border-radius: 8px;
+  background: rgb(255 255 255 / 0.96);
+  box-shadow: 0 24px 70px rgb(23 45 68 / 0.16);
+  text-align: center;
+  position: relative;
+  z-index: 1;
+}
+
+.resources-panel h1 {
+  max-width: 620px;
+  margin: 0;
+  color: #173c63;
+  font-size: clamp(2.5rem, 6vw, 5rem);
+  font-weight: 900;
+  line-height: 0.98;
+  letter-spacing: 0;
+  text-wrap: balance;
+}
+
+.resources-status {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 48px;
+  margin-top: 6px;
+  padding: 12px 18px;
+  border: 1px solid #dbe3ea;
+  border-radius: 8px;
+  background: #f7fafc;
+  color: #123d63;
+  font-weight: 900;
+  letter-spacing: 0.08em;
+  line-height: 1.1;
+  text-transform: uppercase;
+}
+
+.resources-coming-soon {
+  display: grid;
+  justify-items: center;
+  gap: 1rem;
+  margin-top: 6px;
+}
+
+.resources-coming-soon p {
+  margin: 0;
+  color: #52687b;
+  font-size: clamp(1rem, 1.5vw, 1.18rem);
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+.resources-status span {
+  width: 12px;
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: #f1d529;
+  box-shadow: 0 0 0 6px rgb(241 213 41 / 0.16);
+}
+
 .program-detail-admin-grid {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -2113,10 +2295,12 @@ a {
   .site-nav {
     width: 100%;
     gap: 6px;
+    flex-wrap: wrap;
   }
 
   .site-nav a {
-    flex: 1;
+    flex: 1 1 calc(50% - 6px);
+    min-width: 0;
     padding-right: 8px;
     padding-left: 8px;
     text-align: center;
@@ -2286,6 +2470,10 @@ a {
   .programs-page {
     background: #173c75;
   }
+
+  .resources-page {
+    background: #173c75;
+  }
 }
 
 @media (max-width: 1180px) {
@@ -2338,6 +2526,10 @@ a {
     padding: 12px;
   }
 
+  .hr-admin-modal {
+    width: min(100%, calc(100vw - 24px));
+  }
+
   .hr-admin-header,
   .hr-admin-login,
   .hr-admin-editor {
@@ -2357,6 +2549,11 @@ a {
   .hr-admin-upload,
   .hr-admin-photo-editor {
     grid-template-columns: 58px 1fr;
+  }
+
+  .hr-admin-upload .hr-admin-delete,
+  .hr-admin-photo-editor .hr-admin-delete {
+    grid-column: 2;
   }
 
   .hr-admin-section-heading {
@@ -2382,6 +2579,19 @@ a {
 
   .programs-page {
     padding: 0 20px 48px;
+  }
+
+  .programs-blue-field h1 {
+    white-space: normal;
+  }
+
+  .resources-page {
+    min-height: calc(100vh - 146px);
+    padding: 32px 20px 48px;
+  }
+
+  .resources-panel {
+    min-height: 300px;
   }
 
   .program-admin-card-row,

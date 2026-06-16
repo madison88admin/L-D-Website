@@ -2,6 +2,7 @@ import type { ChangeEvent, FormEvent } from 'react';
 import { useEffect, useState } from 'react';
 import {
   getProgramThumbnail,
+  legacyProgramTitles,
   programs,
   type Program,
   type ProgramDetailContent,
@@ -25,8 +26,7 @@ function loadPrograms() {
 
   try {
     const parsedPrograms = JSON.parse(savedPrograms) as Program[];
-    const savedSlugs = new Set(parsedPrograms.map((program) => program.slug));
-    const mergedPrograms = programs.filter((program) => savedSlugs.has(program.slug)).map((program) => {
+    const mergedPrograms = programs.map((program) => {
       const savedProgram = parsedPrograms.find((item) => item.slug === program.slug);
       const mergedProgram = {
         ...program,
@@ -37,21 +37,16 @@ function loadPrograms() {
         },
       };
 
-      if (program.slug === 'communication' && savedProgram?.title === 'Communication') {
-        mergedProgram.title = program.title;
-      }
-
-      if (
-        program.slug === 'problem-solving-critical-thinking' &&
-        savedProgram?.title === 'Problem-solving & Critical Thinking'
-      ) {
+      if (savedProgram?.title && legacyProgramTitles[program.slug]?.includes(savedProgram.title)) {
         mergedProgram.title = program.title;
       }
 
       return mergedProgram;
     });
     const addedPrograms = parsedPrograms.filter(
-      (savedProgram) => !programs.some((program) => program.slug === savedProgram.slug),
+      (savedProgram) =>
+        !programs.some((program) => program.slug === savedProgram.slug) &&
+        !(savedProgram.title === 'New Program' && !savedProgram.image && !savedProgram.link),
     );
 
     return [...mergedPrograms, ...addedPrograms];
@@ -61,8 +56,7 @@ function loadPrograms() {
 }
 
 function normalizePrograms(content: Program[]) {
-  const savedSlugs = new Set(content.map((program) => program.slug));
-  const mergedPrograms = programs.filter((program) => savedSlugs.has(program.slug)).map((program) => {
+  const mergedPrograms = programs.map((program) => {
     const savedProgram = content.find((item) => item.slug === program.slug);
     const mergedProgram = {
       ...program,
@@ -73,21 +67,16 @@ function normalizePrograms(content: Program[]) {
       },
     };
 
-    if (program.slug === 'communication' && savedProgram?.title === 'Communication') {
-      mergedProgram.title = program.title;
-    }
-
-    if (
-      program.slug === 'problem-solving-critical-thinking' &&
-      savedProgram?.title === 'Problem-solving & Critical Thinking'
-    ) {
+    if (savedProgram?.title && legacyProgramTitles[program.slug]?.includes(savedProgram.title)) {
       mergedProgram.title = program.title;
     }
 
     return mergedProgram;
   });
   const addedPrograms = content.filter(
-    (savedProgram) => !programs.some((program) => program.slug === savedProgram.slug),
+    (savedProgram) =>
+      !programs.some((program) => program.slug === savedProgram.slug) &&
+      !(savedProgram.title === 'New Program' && !savedProgram.image && !savedProgram.link),
   );
 
   return [...mergedPrograms, ...addedPrograms];

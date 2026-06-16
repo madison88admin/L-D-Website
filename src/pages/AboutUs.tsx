@@ -19,6 +19,14 @@ type TeamContent = {
     bio: string;
     email?: string;
   };
+  story: {
+    introduction: string;
+    quote: string;
+    mantra: string;
+    contactLabel: string;
+    hrMembersTitle: string;
+    contributorsTitle: string;
+  };
   hrMembers: TeamMember[];
   contributors: TeamMember[];
 };
@@ -45,13 +53,15 @@ const hrAdminPassword = 'Madison88HR!2026';
 const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,
-  specialistBio: 180,
   specialistEmail: 80,
   headingTitle: 70,
   headingDescription: 180,
   memberTitle: 40,
   memberName: 45,
   memberRole: 80,
+  storyText: 420,
+  storyQuote: 260,
+  groupTitle: 40,
 };
 
 const defaultTeamContent: TeamContent = {
@@ -70,27 +80,46 @@ const defaultTeamContent: TeamContent = {
     bio:
       'Leads learning coordination, program support, and development initiatives for the Global HR & Admin group.',
   },
+  story: {
+    introduction:
+      'I am Arabelle Shanley T. Leano, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.',
+    quote:
+      '"Live as if you were to die tomorrow. Learn as if you were to live forever." - Mahatma Gandhi',
+    mantra:
+      '"It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best."',
+    contactLabel: 'Contact Me',
+    hrMembersTitle: 'HR Members',
+    contributorsTitle: 'Contributors',
+  },
   hrMembers: [
     {
+      title: 'For Leadership Development',
       name: 'Laurence Obong',
       role: 'Director, Global HR & Administration',
       initials: 'LA',
       image: '',
     },
     {
+      title: 'For US Best Practices',
       name: 'Lily Kedzuch',
-      role: 'Office Administrator, Workplace Relations & Logistics',
+      role: 'Administrator, Workplace Relations & Office Logistics',
       initials: 'LI',
       image: '',
     },
-    { name: 'Weng', role: 'HR Member', initials: 'WE', image: '' },
     {
+      title: 'For Talent Acquisition',
       name: 'Sherheen Rabano',
-      role: 'Manager, Admin & HR Business Partner',
+      role: 'Manager, Administration & HR Business Partner',
       initials: 'SH',
       image: '',
     },
-    { name: 'Diane Tomale', role: 'HR & Admin Specialist', initials: 'DI', image: '' },
+    {
+      title: 'For Compensation & Benefits',
+      name: 'Diane Tomale',
+      role: 'Specialist, HR & Administration',
+      initials: 'DI',
+      image: '',
+    },
   ],
   contributors: [
     { name: 'Paul Avendano', role: 'IT & AI', initials: 'PA', image: '' },
@@ -116,14 +145,49 @@ const defaultAboutPageContent: AboutPageContent = {
   sections: [],
 };
 
-const specialistIntroduction =
-  'I am Arabelle Shanley T. Leano, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.';
+function normalizeHrMembers(members: TeamMember[] | undefined) {
+  if (!members?.length) return defaultTeamContent.hrMembers;
 
-const specialistQuote =
-  '"Live as if you were to die tomorrow. Learn as if you were to live forever." - Mahatma Gandhi';
+  const savedByName = new Map(members.map((member) => [member.name, member]));
+  const legacyNames = new Set([
+    ...defaultTeamContent.hrMembers.map((member) => member.name),
+    'Weng',
+  ]);
+  const extraMembers = members.filter((member) => !legacyNames.has(member.name));
 
-const specialistMantra =
-  '"It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best."';
+  return [
+    ...defaultTeamContent.hrMembers.map((defaultMember) => {
+      const savedMember = savedByName.get(defaultMember.name);
+      return {
+        ...defaultMember,
+        image: savedMember?.image || defaultMember.image,
+        initials: savedMember?.initials || defaultMember.initials,
+      };
+    }),
+    ...extraMembers,
+  ];
+}
+
+function normalizeTeamContent(content: Partial<TeamContent>): TeamContent {
+  return {
+    ...defaultTeamContent,
+    ...content,
+    heading: {
+      ...defaultTeamContent.heading,
+      ...content.heading,
+    },
+    specialist: {
+      ...defaultTeamContent.specialist,
+      ...content.specialist,
+    },
+    story: {
+      ...defaultTeamContent.story,
+      ...content.story,
+    },
+    hrMembers: normalizeHrMembers(content.hrMembers),
+    contributors: content.contributors || defaultTeamContent.contributors,
+  };
+}
 
 function loadTeamContent() {
   if (typeof window === 'undefined') {
@@ -137,7 +201,7 @@ function loadTeamContent() {
   }
 
   try {
-    return JSON.parse(savedContent) as TeamContent;
+    return normalizeTeamContent(JSON.parse(savedContent) as Partial<TeamContent>);
   } catch {
     return defaultTeamContent;
   }
@@ -280,7 +344,7 @@ function AboutUs() {
     async function loadSharedContent() {
       const [nextAboutPageContent, nextTeamContent] = await Promise.all([
         loadSiteContent(aboutPageStorageKey, defaultAboutPageContent, normalizeAboutPageContent),
-        loadSiteContent(teamStorageKey, defaultTeamContent),
+        loadSiteContent(teamStorageKey, defaultTeamContent, normalizeTeamContent),
       ]);
 
       if (!isMounted) return;
@@ -407,6 +471,17 @@ function AboutUs() {
     }));
   };
 
+  const updateTeamStory = (field: keyof TeamContent['story'], value: string) => {
+    setDraftTeamContent((content) => ({
+      ...content,
+      story: {
+        ...defaultTeamContent.story,
+        ...content.story,
+        [field]: value,
+      },
+    }));
+  };
+
   const updateTeamMember = (
     group: 'hrMembers' | 'contributors',
     index: number,
@@ -433,6 +508,10 @@ function AboutUs() {
       ...content,
       [group]: content[group].filter((_, memberIndex) => memberIndex !== index),
     }));
+  };
+
+  const deleteTeamMemberImage = (group: 'hrMembers' | 'contributors', index: number) => {
+    updateTeamMember(group, index, 'image', '');
   };
 
   const handleImageUpload = async (
@@ -573,13 +652,13 @@ function AboutUs() {
               </div>
               <div className="profile-story">
                 <div>
-                  <p>{specialistIntroduction}</p>
+                  <p>{teamContent.story?.introduction || defaultTeamContent.story.introduction}</p>
                 </div>
                 <div>
-                  <p>{specialistQuote}</p>
+                  <p>{teamContent.story?.quote || defaultTeamContent.story.quote}</p>
                 </div>
                 <div>
-                  <p>{specialistMantra}</p>
+                  <p>{teamContent.story?.mantra || defaultTeamContent.story.mantra}</p>
                 </div>
               </div>
               <br />
@@ -587,12 +666,14 @@ function AboutUs() {
                 className="profile-contact"
                 href={`mailto:${teamContent.specialist.email || defaultTeamContent.specialist.email}?subject=Learning%20%26%20Development%20Inquiry`}
               >
-                Contact Me
+                {teamContent.story?.contactLabel || defaultTeamContent.story.contactLabel}
               </a>
             </article>
 
             <article className="specialist-card hr-members-card">
-              <p className="profile-role">HR Members</p>
+              <p className="profile-role">
+                {teamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}
+              </p>
               <div className="hr-member-list">
                 {teamContent.hrMembers.map((member) => (
                   <article className="contributor-profile" key={member.name}>
@@ -610,7 +691,9 @@ function AboutUs() {
             </article>
 
             <article className="specialist-card contributors-card">
-              <p className="profile-role">Contributors</p>
+              <p className="profile-role">
+                {teamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}
+              </p>
               <div className="contributors-list">
                 {teamContent.contributors.map((contributor) => (
                   <article className="contributor-profile" key={contributor.name}>
@@ -1021,16 +1104,81 @@ function AboutUs() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            updateSpecialist('image', '');
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                     </div>
                   </div>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <h3>Profile Story</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Contact Button Text
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.contactLabel || defaultTeamContent.story.contactLabel}
+                        onChange={(event) => {
+                          updateTeamStory('contactLabel', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      HR Members Heading
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}
+                        onChange={(event) => {
+                          updateTeamStory('hrMembersTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Contributors Heading
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}
+                        onChange={(event) => {
+                          updateTeamStory('contributorsTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <label>
-                    Bio
+                    Introduction
                     <textarea
-                      maxLength={teamFieldLimits.specialistBio}
-                      value={draftTeamContent.specialist.bio}
+                      maxLength={teamFieldLimits.storyText}
+                      value={draftTeamContent.story?.introduction || defaultTeamContent.story.introduction}
                       onChange={(event) => {
-                        updateSpecialist('bio', event.target.value);
+                        updateTeamStory('introduction', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Quote
+                    <textarea
+                      maxLength={teamFieldLimits.storyQuote}
+                      value={draftTeamContent.story?.quote || defaultTeamContent.story.quote}
+                      onChange={(event) => {
+                        updateTeamStory('quote', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Goal / Mantra
+                    <textarea
+                      maxLength={teamFieldLimits.storyText}
+                      value={draftTeamContent.story?.mantra || defaultTeamContent.story.mantra}
+                      onChange={(event) => {
+                        updateTeamStory('mantra', event.target.value);
                       }}
                     />
                   </label>
@@ -1038,7 +1186,7 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>HR Members</h3>
+                    <h3>{draftTeamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}</h3>
                     <button
                       className="hr-admin-small-action"
                       type="button"
@@ -1078,6 +1226,15 @@ function AboutUs() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            deleteTeamMemberImage('hrMembers', index);
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                       <input
                         aria-label="HR member title"
@@ -1118,7 +1275,7 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>Contributors</h3>
+                    <h3>{draftTeamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}</h3>
                     <button
                       className="hr-admin-small-action"
                       type="button"
@@ -1158,6 +1315,15 @@ function AboutUs() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            deleteTeamMemberImage('contributors', index);
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                       <input
                         aria-label="Contributor title"
