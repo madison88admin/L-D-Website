@@ -51,6 +51,7 @@ export async function loadSiteContent<T>(
 export async function saveSiteContent<T>(key: string, content: T) {
   if (!supabase) {
     writeLocalContent(key, content);
+    console.error('[saveSiteContent] Supabase is not configured. Check VITE_SUPABASE_URL / VITE_SUPABASE_PUBLISHABLE_KEY env vars on the host.');
     throw new Error('Supabase is not configured.');
   }
 
@@ -66,6 +67,7 @@ export async function saveSiteContent<T>(key: string, content: T) {
     );
 
   if (error) {
+    console.error(`[saveSiteContent] Supabase upsert failed for key "${key}":`, error);
     throw error;
   }
 
