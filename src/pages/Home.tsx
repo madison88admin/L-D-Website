@@ -1,7 +1,9 @@
 import type { ChangeEvent, CSSProperties, FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getLinkThumbnail, getProgramThumbnail, programs, type Program } from '../data/programs';
+import { getLinkThumbnail, getProgramThumbnail, legacyProgramTitles, programs, type Program } from '../data/programs';
+import { uploadImageToStorage } from '../lib/imageStorage';
+import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 const programsStorageKey = 'madison88-program-content';
 
@@ -11,18 +13,48 @@ function loadPrograms(): Program[] {
     const saved = window.localStorage.getItem(programsStorageKey);
     if (!saved) return programs;
     const parsed = JSON.parse(saved) as Program[];
-    const savedSlugs = new Set(parsed.map((p) => p.slug));
-    const merged = programs
-      .filter((p) => savedSlugs.has(p.slug))
-      .map((p) => {
-        const saved = parsed.find((s) => s.slug === p.slug);
-        return { ...p, ...saved, detail: { ...p.detail, ...saved?.detail } };
+    if (!parsed.length) return programs;
+    return parsed
+      .filter((s) => !(s.title === 'New Program' && !s.image && !s.link))
+      .map((s) => {
+        const defaultProgram = programs.find((p) => p.slug === s.slug);
+        const mergedProgram = {
+          ...defaultProgram,
+          ...s,
+          detail: {
+            ...defaultProgram?.detail,
+            ...s.detail,
+          },
+        } as Program;
+        if (defaultProgram && s.title && legacyProgramTitles[s.slug]?.includes(s.title)) {
+          mergedProgram.title = defaultProgram.title;
+        }
+        return mergedProgram;
       });
-    const added = parsed.filter((s) => !programs.some((p) => p.slug === s.slug));
-    return [...merged, ...added];
   } catch {
     return programs;
   }
+}
+
+function normalizePrograms(content: Program[]) {
+  if (!content.length) return programs;
+  return content
+    .filter((s) => !(s.title === 'New Program' && !s.image && !s.link))
+    .map((s) => {
+      const defaultProgram = programs.find((p) => p.slug === s.slug);
+      const mergedProgram = {
+        ...defaultProgram,
+        ...s,
+        detail: {
+          ...defaultProgram?.detail,
+          ...s.detail,
+        },
+      } as Program;
+      if (defaultProgram && s.title && legacyProgramTitles[s.slug]?.includes(s.title)) {
+        mergedProgram.title = defaultProgram.title;
+      }
+      return mergedProgram;
+    });
 }
 
 type ProgramPreviewStyle = CSSProperties & {
@@ -45,6 +77,14 @@ type TeamContent = {
   specialist: TeamMember & {
     bio: string;
     email?: string;
+  };
+  story: {
+    introduction: string;
+    quote: string;
+    mantra: string;
+    contactLabel: string;
+    hrMembersTitle: string;
+    contributorsTitle: string;
   };
   hrMembers: TeamMember[];
   contributors: TeamMember[];
@@ -99,13 +139,18 @@ function loadFeaturedSlugs(allPrograms: typeof programs): string[] {
   return allPrograms.slice(0, MAX_FEATURED).map((p) => p.slug);
 }
 
-function saveFeaturedSlugs(slugs: string[]) {
-  window.localStorage.setItem(featuredStorageKey, JSON.stringify(slugs));
+async function saveFeaturedSlugs(slugs: string[]) {
+  await saveSiteContent(featuredStorageKey, slugs);
 }
+
+function getValidFeaturedSlugs(slugs: string[], availablePrograms: Program[]) {
+  const availableSlugs = new Set(availablePrograms.map((program) => program.slug));
+  return slugs.filter((slug) => availableSlugs.has(slug)).slice(0, MAX_FEATURED);
+}
+
 const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,
-  specialistBio: 180,
   specialistEmail: 80,
   headingTitle: 70,
   headingDescription: 180,
@@ -113,6 +158,9 @@ const teamFieldLimits = {
   memberName: 45,
   memberRole: 80,
   initials: 4,
+  storyText: 420,
+  storyQuote: 260,
+  groupTitle: 40,
 };
 
 const defaultTeamContent: TeamContent = {
@@ -131,27 +179,46 @@ const defaultTeamContent: TeamContent = {
     bio:
       'Leads learning coordination, program support, and development initiatives for the Global HR & Admin group.',
   },
+  story: {
+    introduction:
+      'I am Arabelle Shanley T. Leano, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.',
+    quote:
+      '"Live as if you were to die tomorrow. Learn as if you were to live forever." - Mahatma Gandhi',
+    mantra:
+      '"It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best."',
+    contactLabel: 'Contact Me',
+    hrMembersTitle: 'HR Members',
+    contributorsTitle: 'Contributors',
+  },
   hrMembers: [
     {
+      title: 'For Leadership Development',
       name: 'Laurence Obong',
       role: 'Director, Global HR & Administration',
       initials: 'LA',
       image: '',
     },
     {
+      title: 'For US Best Practices',
       name: 'Lily Kedzuch',
-      role: 'Office Administrator, Workplace Relations & Logistics',
+      role: 'Administrator, Workplace Relations & Office Logistics',
       initials: 'LI',
       image: '',
     },
-    { name: 'Weng', role: 'HR Member', initials: 'WE', image: '' },
     {
+      title: 'For Talent Acquisition',
       name: 'Sherheen Rabano',
-      role: 'Manager, Admin & HR Business Partner',
+      role: 'Manager, Administration & HR Business Partner',
       initials: 'SH',
       image: '',
     },
-    { name: 'Diane Tomale', role: 'HR & Admin Specialist', initials: 'DI', image: '' },
+    {
+      title: 'For Compensation & Benefits',
+      name: 'Diane Tomale',
+      role: 'Specialist, HR & Administration',
+      initials: 'DI',
+      image: '',
+    },
   ],
   contributors: [
     { name: 'Paul Avendano', role: 'IT & AI', initials: 'PA', image: '' },
@@ -221,8 +288,8 @@ const defaultFeaturedCoursesContent: FeaturedCoursesContent = {
 const defaultHomeHeroContent: HomeHeroContent = {
   logo: '/images/madison88-logo-yellow.png',
   backgroundVideo: '/videos/hero-background.mp4',
-  titleLineOne: 'Learning &',
-  titleLineTwo: 'Organizational',
+  titleLineOne: 'Learning & Organizational',
+  titleLineTwo: '',
   titleLineThree: 'Development',
   tagline: 'Upskill. Excel. Succeed.',
 };
@@ -236,6 +303,44 @@ const specialistQuote =
 const specialistMantra =
   '“It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best.”';
 
+function normalizeHrMembers(members: TeamMember[] | undefined) {
+  if (!members?.length) return defaultTeamContent.hrMembers;
+
+  const defaultByName = new Map(defaultTeamContent.hrMembers.map((member) => [member.name, member]));
+  const savedNames = new Set(members.map((member) => member.name));
+  const normalizedSavedMembers = members
+    .filter((member) => member.name !== 'Weng')
+    .map((member) => ({
+      ...defaultByName.get(member.name),
+      ...member,
+      initials: getMemberInitials(member.name),
+    }));
+  const missingDefaultMembers = defaultTeamContent.hrMembers.filter((member) => !savedNames.has(member.name));
+
+  return [...normalizedSavedMembers, ...missingDefaultMembers];
+}
+
+function normalizeTeamContent(content: Partial<TeamContent>): TeamContent {
+  return {
+    ...defaultTeamContent,
+    ...content,
+    heading: {
+      ...defaultTeamContent.heading,
+      ...content.heading,
+    },
+    specialist: {
+      ...defaultTeamContent.specialist,
+      ...content.specialist,
+    },
+    story: {
+      ...defaultTeamContent.story,
+      ...content.story,
+    },
+    hrMembers: normalizeHrMembers(content.hrMembers),
+    contributors: content.contributors || defaultTeamContent.contributors,
+  };
+}
+
 function loadTeamContent() {
   if (typeof window === 'undefined') {
     return defaultTeamContent;
@@ -248,14 +353,14 @@ function loadTeamContent() {
   }
 
   try {
-    return JSON.parse(savedContent) as TeamContent;
+    return normalizeTeamContent(JSON.parse(savedContent) as Partial<TeamContent>);
   } catch {
     return defaultTeamContent;
   }
 }
 
-function saveTeamContent(content: TeamContent) {
-  window.localStorage.setItem(teamStorageKey, JSON.stringify(content));
+async function saveTeamContent(content: TeamContent) {
+  await saveSiteContent(teamStorageKey, content);
 }
 
 function loadFeaturedCoursesContent() {
@@ -296,8 +401,31 @@ function loadFeaturedCoursesContent() {
   }
 }
 
-function saveFeaturedCoursesContent(content: FeaturedCoursesContent) {
-  window.localStorage.setItem(featuredCoursesStorageKey, JSON.stringify(content));
+function normalizeFeaturedCoursesContent(content: Partial<
+  Omit<FeaturedCoursesContent, 'cards'> & {
+    cards: Array<Partial<FeaturedCourseCard> & { theme?: FeaturedCourseCard['column'] }>;
+  }
+>): FeaturedCoursesContent {
+  const cards = content.cards?.length
+    ? content.cards.map((card) => ({
+        title: card.title || 'Course',
+        subtitle: card.subtitle || '',
+        description: card.description || '',
+        link: card.link || '',
+        image: card.image || '',
+        column: card.column || card.theme || 'copilot',
+      }))
+    : defaultFeaturedCoursesContent.cards;
+
+  return {
+    ...defaultFeaturedCoursesContent,
+    ...content,
+    cards,
+  };
+}
+
+async function saveFeaturedCoursesContent(content: FeaturedCoursesContent) {
+  await saveSiteContent(featuredCoursesStorageKey, content);
 }
 
 function loadHomeHeroContent() {
@@ -318,53 +446,8 @@ function loadHomeHeroContent() {
   }
 }
 
-function saveHomeHeroContent(content: HomeHeroContent) {
-  window.localStorage.setItem(homeHeroStorageKey, JSON.stringify(content));
-}
-
-function resizeImageForStorage(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const image = new Image();
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to read image file.'));
-        return;
-      }
-
-      image.src = reader.result;
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Unable to read image file.'));
-    };
-
-    image.onload = () => {
-      const maxSize = 640;
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.round(image.width * scale);
-      const height = Math.round(image.height * scale);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Unable to prepare image.'));
-        return;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
-    };
-
-    image.onerror = () => {
-      reject(new Error('Unable to load image file.'));
-    };
-
-    reader.readAsDataURL(file);
-  });
+async function saveHomeHeroContent(content: HomeHeroContent) {
+  await saveSiteContent(homeHeroStorageKey, content);
 }
 
 function readFileForStorage(file: File) {
@@ -408,12 +491,17 @@ function getBlankFeaturedCourseCard(): FeaturedCourseCard {
     column: 'copilot',
   };
 }
+
+function getMemberInitials(name: string) {
+  const letters = name.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase();
+  return letters || 'NA';
+}
  
 function Home() {
   const [homeHeroContent, setHomeHeroContent] = useState(loadHomeHeroContent);
   const [draftHomeHeroContent, setDraftHomeHeroContent] = useState(homeHeroContent);
   const [isHeroAdminOpen, setIsHeroAdminOpen] = useState(false);
-  const [allPrograms] = useState(loadPrograms);
+  const [allPrograms, setAllPrograms] = useState(loadPrograms);
   const [featuredSlugs, setFeaturedSlugs] = useState(() => loadFeaturedSlugs(programs));
   const [draftFeaturedSlugs, setDraftFeaturedSlugs] = useState(featuredSlugs);
   const [isFeaturedAdminOpen, setIsFeaturedAdminOpen] = useState(false);
@@ -427,13 +515,59 @@ function Home() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSharedContent() {
+      const [
+        nextHomeHeroContent,
+        nextPrograms,
+        nextFeaturedSlugs,
+        nextFeaturedCoursesContent,
+        nextTeamContent,
+      ] = await Promise.all([
+        loadSiteContent(homeHeroStorageKey, defaultHomeHeroContent, (content) => ({
+          ...defaultHomeHeroContent,
+          ...content,
+        })),
+        loadSiteContent(programsStorageKey, programs, normalizePrograms),
+        loadSiteContent(featuredStorageKey, programs.slice(0, MAX_FEATURED).map((p) => p.slug), (content) =>
+          Array.isArray(content) && content.length > 0 ? content.slice(0, MAX_FEATURED) : programs.slice(0, MAX_FEATURED).map((p) => p.slug),
+        ),
+        loadSiteContent(featuredCoursesStorageKey, defaultFeaturedCoursesContent, normalizeFeaturedCoursesContent),
+        loadSiteContent(teamStorageKey, defaultTeamContent, normalizeTeamContent),
+      ]);
+
+      if (!isMounted) return;
+
+      setHomeHeroContent(nextHomeHeroContent);
+      setDraftHomeHeroContent(nextHomeHeroContent);
+      setAllPrograms(nextPrograms);
+      setFeaturedSlugs(getValidFeaturedSlugs(nextFeaturedSlugs, nextPrograms));
+      setDraftFeaturedSlugs(getValidFeaturedSlugs(nextFeaturedSlugs, nextPrograms));
+      setFeaturedCoursesContent(nextFeaturedCoursesContent);
+      setDraftFeaturedCoursesContent(nextFeaturedCoursesContent);
+      setTeamContent(nextTeamContent);
+      setDraftTeamContent(nextTeamContent);
+    }
+
+    loadSharedContent().catch(() => {
+      setSaveError('Unable to load shared content from Supabase. Showing local/default content.');
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const programHighlights = allPrograms
     .filter((p) => featuredSlugs.includes(p.slug))
     .sort((a, b) => featuredSlugs.indexOf(a.slug) - featuredSlugs.indexOf(b.slug));
 
   const openFeaturedAdmin = () => {
-    setDraftFeaturedSlugs(featuredSlugs);
+    setDraftFeaturedSlugs(getValidFeaturedSlugs(featuredSlugs, allPrograms));
     setIsFeaturedAdminOpen(true);
   };
 
@@ -449,16 +583,30 @@ function Home() {
 
   const toggleFeatured = (slug: string) => {
     setDraftFeaturedSlugs((prev) => {
-      if (prev.includes(slug)) return prev.filter((s) => s !== slug);
-      if (prev.length >= MAX_FEATURED) return prev;
-      return [...prev, slug];
+      const validFeaturedSlugs = getValidFeaturedSlugs(prev, allPrograms);
+      if (validFeaturedSlugs.includes(slug)) {
+        return validFeaturedSlugs.filter((s) => s !== slug);
+      }
+      if (validFeaturedSlugs.length >= MAX_FEATURED) return validFeaturedSlugs;
+      return [...validFeaturedSlugs, slug];
     });
   };
 
-  const saveFeatured = () => {
-    saveFeaturedSlugs(draftFeaturedSlugs);
-    setFeaturedSlugs(draftFeaturedSlugs);
-    setIsFeaturedAdminOpen(false);
+  const saveFeatured = async () => {
+    const validFeaturedSlugs = getValidFeaturedSlugs(draftFeaturedSlugs, allPrograms);
+
+    setIsSaving(true);
+    try {
+      await saveFeaturedSlugs(validFeaturedSlugs);
+      setFeaturedSlugs(validFeaturedSlugs);
+      setDraftFeaturedSlugs(validFeaturedSlugs);
+      setSaveError('');
+      setIsFeaturedAdminOpen(false);
+    } catch {
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   const openHrEditor = () => {
@@ -478,36 +626,45 @@ function Home() {
     setLoginError('Invalid HR login.');
   };
 
-  const handleTeamSave = () => {
+  const handleTeamSave = async () => {
+    setIsSaving(true);
     try {
-      saveTeamContent(draftTeamContent);
+      await saveTeamContent(draftTeamContent);
       setTeamContent(draftTeamContent);
       setSaveError('');
       setIsAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleFeaturedCoursesSave = () => {
+  const handleFeaturedCoursesSave = async () => {
+    setIsSaving(true);
     try {
-      saveFeaturedCoursesContent(draftFeaturedCoursesContent);
+      await saveFeaturedCoursesContent(draftFeaturedCoursesContent);
       setFeaturedCoursesContent(draftFeaturedCoursesContent);
       setSaveError('');
       setIsFeaturedCoursesAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleHeroSave = () => {
+  const handleHeroSave = async () => {
+    setIsSaving(true);
     try {
-      saveHomeHeroContent(draftHomeHeroContent);
+      await saveHomeHeroContent(draftHomeHeroContent);
       setHomeHeroContent(draftHomeHeroContent);
       setSaveError('');
       setIsHeroAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller files.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -515,6 +672,14 @@ function Home() {
     setDraftHomeHeroContent((content) => ({
       ...content,
       [field]: value,
+    }));
+  };
+
+  const updateHomeHeroDisplayLineOne = (value: string) => {
+    setDraftHomeHeroContent((content) => ({
+      ...content,
+      titleLineOne: value,
+      titleLineTwo: '',
     }));
   };
 
@@ -559,6 +724,23 @@ function Home() {
     updateFeaturedCourseCard(index, 'image', '');
   };
 
+  const moveFeaturedCourseCard = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftFeaturedCoursesContent((content) => {
+      if (toIndex >= content.cards.length) return content;
+
+      const nextCards = [...content.cards];
+      const [movedCard] = nextCards.splice(fromIndex, 1);
+      nextCards.splice(toIndex, 0, movedCard);
+
+      return {
+        ...content,
+        cards: nextCards,
+      };
+    });
+  };
+
   const updateSpecialist = (field: keyof TeamContent['specialist'], value: string) => {
     setDraftTeamContent((content) => ({
       ...content,
@@ -575,6 +757,17 @@ function Home() {
       heading: {
         title: content.heading?.title || defaultTeamContent.heading.title,
         description: content.heading?.description || defaultTeamContent.heading.description,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateTeamStory = (field: keyof TeamContent['story'], value: string) => {
+    setDraftTeamContent((content) => ({
+      ...content,
+      story: {
+        ...defaultTeamContent.story,
+        ...content.story,
         [field]: value,
       },
     }));
@@ -608,22 +801,47 @@ function Home() {
     }));
   };
 
+  const deleteTeamMemberImage = (group: 'hrMembers' | 'contributors', index: number) => {
+    updateTeamMember(group, index, 'image', '');
+  };
+
+  const moveTeamMember = (group: 'hrMembers' | 'contributors', fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftTeamContent((content) => {
+      if (toIndex >= content[group].length) return content;
+
+      const nextMembers = [...content[group]];
+      const [movedMember] = nextMembers.splice(fromIndex, 1);
+      nextMembers.splice(toIndex, 0, movedMember);
+
+      return {
+        ...content,
+        [group]: nextMembers,
+      };
+    });
+  };
+
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>,
     updateImage: (image: string) => void,
+    folder = 'home',
   ) => {
     const file = event.target.files?.[0];
+    const input = event.currentTarget;
 
     if (!file) {
       return;
     }
 
     try {
-      const resizedImage = await resizeImageForStorage(file);
-      updateImage(resizedImage);
+      const imageUrl = await uploadImageToStorage(file, folder);
+      updateImage(imageUrl);
       setSaveError('');
     } catch {
       setSaveError('Image upload failed. Please try a different image.');
+    } finally {
+      input.value = '';
     }
   };
 
@@ -638,7 +856,7 @@ function Home() {
           }}
         />
       )}
-      <span>{member.initials}</span>
+      <span>{getMemberInitials(member.name)}</span>
     </>
   );
 
@@ -741,8 +959,11 @@ function Home() {
             />
           )}
           <h1>
-            {homeHeroContent.titleLineOne}
-            {homeHeroContent.titleLineTwo && <span>{homeHeroContent.titleLineTwo}</span>}
+            <span>
+              {[homeHeroContent.titleLineOne, homeHeroContent.titleLineTwo]
+                .filter(Boolean)
+                .join(' ')}
+            </span>
             {homeHeroContent.titleLineThree && <span>{homeHeroContent.titleLineThree}</span>}
           </h1>
           {homeHeroContent.tagline && <p>{homeHeroContent.tagline}</p>}
@@ -751,8 +972,9 @@ function Home() {
 
       <section className="careers-section">
         <div className="section-inner featured-courses-content">
-          <div className="careers-copy">
-            <p className="section-kicker">{featuredCoursesContent.kicker}</p>
+          <div className="careers-copy"><br></br>
+            <p className="section-kicker">{featuredCoursesContent.kicker}</p><br>
+</br><br></br><br></br><br></br>
             <h2
               className="featured-courses-title"
               onClick={(event) => {
@@ -768,7 +990,6 @@ function Home() {
               </span>
             </h2>
           </div>
-
           <div className="featured-course-board">
             <div className="featured-phase-heading">
               <span>{featuredCoursesContent.phaseKicker}</span>
@@ -869,13 +1090,13 @@ function Home() {
               </div>
               <div className="profile-story">
                 <div>
-                  <p>{specialistIntroduction}</p>
+                  <p>{teamContent.story?.introduction || defaultTeamContent.story.introduction}</p>
                 </div>
                 <div>
-                  <p>{specialistQuote}</p>
+                  <p>{teamContent.story?.quote || defaultTeamContent.story.quote}</p>
                 </div>
                 <div>
-                  <p>{specialistMantra}</p>
+                  <p>{teamContent.story?.mantra || defaultTeamContent.story.mantra}</p>
                 </div>
               </div>
               <br></br>
@@ -883,12 +1104,14 @@ function Home() {
                 className="profile-contact"
                 href={`mailto:${teamContent.specialist.email || defaultTeamContent.specialist.email}?subject=Learning%20%26%20Development%20Inquiry`}
               >
-                Contact Me
+                {teamContent.story?.contactLabel || defaultTeamContent.story.contactLabel}
               </a>
             </article>
 
             <article className="specialist-card hr-members-card">
-              <p className="profile-role">HR Members</p>
+              <p className="profile-role">
+                {teamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}
+              </p>
               <div className="hr-member-list">
                 {teamContent.hrMembers.map((member) => (
                   <article className="contributor-profile" key={member.name}>
@@ -906,7 +1129,9 @@ function Home() {
             </article>
 
             <article className="specialist-card contributors-card">
-              <p className="profile-role">Contributors</p>
+              <p className="profile-role">
+                {teamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}
+              </p>
               <div className="contributors-list">
                 {teamContent.contributors.map((contributor) => (
                   <article className="contributor-profile" key={contributor.name}>
@@ -976,21 +1201,17 @@ function Home() {
                     <label>
                       Title Line 1
                       <input
-                        maxLength={40}
-                        value={draftHomeHeroContent.titleLineOne}
-                        onChange={(event) => updateHomeHeroContent('titleLineOne', event.target.value)}
+                        maxLength={80}
+                        value={
+                          [draftHomeHeroContent.titleLineOne, draftHomeHeroContent.titleLineTwo]
+                            .filter(Boolean)
+                            .join(' ')
+                        }
+                        onChange={(event) => updateHomeHeroDisplayLineOne(event.target.value)}
                       />
                     </label>
                     <label>
                       Title Line 2
-                      <input
-                        maxLength={40}
-                        value={draftHomeHeroContent.titleLineTwo}
-                        onChange={(event) => updateHomeHeroContent('titleLineTwo', event.target.value)}
-                      />
-                    </label>
-                    <label>
-                      Title Line 3
                       <input
                         maxLength={40}
                         value={draftHomeHeroContent.titleLineThree}
@@ -1041,7 +1262,7 @@ function Home() {
                             type="file"
                             accept="image/*"
                             onChange={(event) => {
-                              handleImageUpload(event, (image) => updateHomeHeroContent('logo', image));
+                              handleImageUpload(event, (image) => updateHomeHeroContent('logo', image), 'home/hero');
                             }}
                           />
                           <span className="hr-admin-file-button">Choose File</span>
@@ -1099,8 +1320,8 @@ function Home() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleHeroSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleHeroSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1242,6 +1463,24 @@ function Home() {
                           </div>
 
                           <div className="featured-course-admin-fields">
+                            <div className="hr-admin-reorder-controls" aria-label="Reorder course card">
+                              <button
+                                type="button"
+                                onClick={() => moveFeaturedCourseCard(index, index - 1)}
+                                disabled={index === 0}
+                                aria-label={`Move ${card.title} up`}
+                              >
+                                ▲
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => moveFeaturedCourseCard(index, index + 1)}
+                                disabled={index === draftFeaturedCoursesContent.cards.length - 1}
+                                aria-label={`Move ${card.title} down`}
+                              >
+                                ▼
+                              </button>
+                            </div>
                             <div className="hr-admin-grid">
                               <label>
                                 Title
@@ -1300,7 +1539,7 @@ function Home() {
                                   onChange={(event) => {
                                     handleImageUpload(event, (image) => {
                                       updateFeaturedCourseCard(index, 'image', image);
-                                    });
+                                    }, 'home/featured-courses');
                                   }}
                                 />
                                 <span className="hr-admin-file-button">Choose File</span>
@@ -1338,8 +1577,8 @@ function Home() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleFeaturedCoursesSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleFeaturedCoursesSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1394,12 +1633,13 @@ function Home() {
                 <section className="hr-admin-editor-section">
                   <p style={{ marginBottom: '12px', color: '#52687b', fontSize: '0.92rem' }}>
                     Select up to {MAX_FEATURED} programs to feature on the home page.
-                    ({draftFeaturedSlugs.length}/{MAX_FEATURED} selected)
+                    ({getValidFeaturedSlugs(draftFeaturedSlugs, allPrograms).length}/{MAX_FEATURED} selected)
                   </p>
                   <div className="featured-program-picker">
-                    {programs.map((program) => {
-                      const isSelected = draftFeaturedSlugs.includes(program.slug);
-                      const isDisabled = !isSelected && draftFeaturedSlugs.length >= MAX_FEATURED;
+                    {allPrograms.map((program) => {
+                      const selectedFeaturedSlugs = getValidFeaturedSlugs(draftFeaturedSlugs, allPrograms);
+                      const isSelected = selectedFeaturedSlugs.includes(program.slug);
+                      const isDisabled = !isSelected && selectedFeaturedSlugs.length >= MAX_FEATURED;
                       return (
                         <label
                           key={program.slug}
@@ -1423,8 +1663,8 @@ function Home() {
                   <button type="button" onClick={() => { setDraftFeaturedSlugs(featuredSlugs); setIsFeaturedAdminOpen(false); }}>
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={saveFeatured}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={saveFeatured} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -1572,22 +1812,87 @@ function Home() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateSpecialist('image', image);
-                            });
+                            }, 'home/team');
                           }}
                         />
                         <label className="hr-admin-file-button" htmlFor="specialist-photo-upload">
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            updateSpecialist('image', '');
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                     </div>
                   </div>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <h3>Profile Story</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Contact Button Text
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.contactLabel || defaultTeamContent.story.contactLabel}
+                        onChange={(event) => {
+                          updateTeamStory('contactLabel', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      HR Members Heading
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}
+                        onChange={(event) => {
+                          updateTeamStory('hrMembersTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Contributors Heading
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}
+                        onChange={(event) => {
+                          updateTeamStory('contributorsTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <label>
-                    Bio
+                    Introduction
                     <textarea
-                      maxLength={teamFieldLimits.specialistBio}
-                      value={draftTeamContent.specialist.bio}
+                      maxLength={teamFieldLimits.storyText}
+                      value={draftTeamContent.story?.introduction || defaultTeamContent.story.introduction}
                       onChange={(event) => {
-                        updateSpecialist('bio', event.target.value);
+                        updateTeamStory('introduction', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Quote
+                    <textarea
+                      maxLength={teamFieldLimits.storyQuote}
+                      value={draftTeamContent.story?.quote || defaultTeamContent.story.quote}
+                      onChange={(event) => {
+                        updateTeamStory('quote', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Goal / Mantra
+                    <textarea
+                      maxLength={teamFieldLimits.storyText}
+                      value={draftTeamContent.story?.mantra || defaultTeamContent.story.mantra}
+                      onChange={(event) => {
+                        updateTeamStory('mantra', event.target.value);
                       }}
                     />
                   </label>
@@ -1595,7 +1900,7 @@ function Home() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>HR Members</h3>
+                    <h3>{draftTeamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}</h3>
                     <button
                       className="hr-admin-small-action"
                       type="button"
@@ -1615,6 +1920,24 @@ function Home() {
                   </div>
                   {draftTeamContent.hrMembers.map((member, index) => (
                     <div className="hr-admin-member-row" key={`hr-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder HR member">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index + 1)}
+                          disabled={index === draftTeamContent.hrMembers.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">
                           {renderMemberPhoto(member)}
@@ -1628,7 +1951,7 @@ function Home() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('hrMembers', index, 'image', image);
-                            });
+                            }, 'home/hr-members');
                           }}
                         />
                         <label
@@ -1637,6 +1960,15 @@ function Home() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            deleteTeamMemberImage('hrMembers', index);
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                       <input
                         aria-label="HR member title"
@@ -1677,7 +2009,7 @@ function Home() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>Contributors</h3>
+                    <h3>{draftTeamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}</h3>
                     <button
                       className="hr-admin-small-action"
                       type="button"
@@ -1697,6 +2029,24 @@ function Home() {
                   </div>
                   {draftTeamContent.contributors.map((member, index) => (
                     <div className="hr-admin-member-row" key={`contributor-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder contributor">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index + 1)}
+                          disabled={index === draftTeamContent.contributors.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">
                           {renderMemberPhoto(member)}
@@ -1710,7 +2060,7 @@ function Home() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('contributors', index, 'image', image);
-                            });
+                            }, 'home/contributors');
                           }}
                         />
                         <label
@@ -1719,6 +2069,15 @@ function Home() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            deleteTeamMemberImage('contributors', index);
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                       <input
                         aria-label="Contributor title"
@@ -1768,8 +2127,8 @@ function Home() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>

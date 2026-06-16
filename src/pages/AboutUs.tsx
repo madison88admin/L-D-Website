@@ -1,5 +1,7 @@
 import type { ChangeEvent, FormEvent } from 'react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import { uploadImageToStorage } from '../lib/imageStorage';
+import { loadSiteContent, saveSiteContent } from '../lib/siteContent';
 
 type TeamMember = {
   title?: string;
@@ -18,6 +20,14 @@ type TeamContent = {
     bio: string;
     email?: string;
   };
+  story: {
+    introduction: string;
+    quote: string;
+    mantra: string;
+    contactLabel: string;
+    hrMembersTitle: string;
+    contributorsTitle: string;
+  };
   hrMembers: TeamMember[];
   contributors: TeamMember[];
 };
@@ -26,8 +36,11 @@ type AboutPageContent = {
   aboutTitle: string;
   aboutParagraph: string;
   aboutImage: string;
+  isAboutHidden?: boolean;
   excellenceTitle: string;
   excellenceParagraph: string;
+  isExcellenceHidden?: boolean;
+  aboutSectionOrder?: AboutSectionId[];
   sections: AboutPageSection[];
 };
 
@@ -37,6 +50,8 @@ type AboutPageSection = {
   image: string;
 };
 
+type AboutSectionId = 'about' | 'excellence' | 'additional';
+
 const aboutPageStorageKey = 'madison88-about-page-content';
 const teamStorageKey = 'madison88-team-content';
 const hrAdminUsername = 'hr-admin';
@@ -44,13 +59,15 @@ const hrAdminPassword = 'Madison88HR!2026';
 const teamFieldLimits = {
   specialistName: 60,
   specialistRole: 90,
-  specialistBio: 180,
   specialistEmail: 80,
   headingTitle: 70,
   headingDescription: 180,
   memberTitle: 40,
   memberName: 45,
   memberRole: 80,
+  storyText: 420,
+  storyQuote: 260,
+  groupTitle: 40,
 };
 
 const defaultTeamContent: TeamContent = {
@@ -69,27 +86,46 @@ const defaultTeamContent: TeamContent = {
     bio:
       'Leads learning coordination, program support, and development initiatives for the Global HR & Admin group.',
   },
+  story: {
+    introduction:
+      'I am Arabelle Shanley T. Leano, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.',
+    quote:
+      '"Live as if you were to die tomorrow. Learn as if you were to live forever." - Mahatma Gandhi',
+    mantra:
+      '"It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best."',
+    contactLabel: 'Contact Me',
+    hrMembersTitle: 'HR Members',
+    contributorsTitle: 'Contributors',
+  },
   hrMembers: [
     {
+      title: 'For Leadership Development',
       name: 'Laurence Obong',
       role: 'Director, Global HR & Administration',
       initials: 'LA',
       image: '',
     },
     {
+      title: 'For US Best Practices',
       name: 'Lily Kedzuch',
-      role: 'Office Administrator, Workplace Relations & Logistics',
+      role: 'Administrator, Workplace Relations & Office Logistics',
       initials: 'LI',
       image: '',
     },
-    { name: 'Weng', role: 'HR Member', initials: 'WE', image: '' },
     {
+      title: 'For Talent Acquisition',
       name: 'Sherheen Rabano',
-      role: 'Manager, Admin & HR Business Partner',
+      role: 'Manager, Administration & HR Business Partner',
       initials: 'SH',
       image: '',
     },
-    { name: 'Diane Tomale', role: 'HR & Admin Specialist', initials: 'DI', image: '' },
+    {
+      title: 'For Compensation & Benefits',
+      name: 'Diane Tomale',
+      role: 'Specialist, HR & Administration',
+      initials: 'DI',
+      image: '',
+    },
   ],
   contributors: [
     { name: 'Paul Avendano', role: 'IT & AI', initials: 'PA', image: '' },
@@ -109,20 +145,52 @@ const defaultAboutPageContent: AboutPageContent = {
   aboutParagraph:
     'A privately held outdoor accessories company with a primary office location in Denver, CO. We are a world-class design, development and manufacturing company that can help reimagine what your assortments can be.',
   aboutImage: '/images/about-person.png',
+  isAboutHidden: false,
   excellenceTitle: 'Madison 88 Center for Excellence',
   excellenceParagraph:
     "At Madison 88 Center for Excellence, our mission is to empower employees with the skills and mindset needed to thrive in an ever-evolving business landscape. We aim to upskill and future-proof our workforce, fostering innovation and adaptability not only within the industries we serve but also in each individual's personal career journey. Through continuous learning, cutting-edge training, and a culture of growth, we prepare our people to lead with confidence, embrace change, and unlock their full potential.",
+  isExcellenceHidden: false,
+  aboutSectionOrder: ['about', 'excellence', 'additional'],
   sections: [],
 };
 
-const specialistIntroduction =
-  'I am Arabelle Shanley T. Leano, an HR Associate and Learning & Organizational Development (L&OD) Specialist at Madison 88. I hold a BS in Psychology with Latin honors and work with the HR team to drive employee growth through impactful learning and development programs.';
+function normalizeHrMembers(members: TeamMember[] | undefined) {
+  if (!members?.length) return defaultTeamContent.hrMembers;
 
-const specialistQuote =
-  '"Live as if you were to die tomorrow. Learn as if you were to live forever." - Mahatma Gandhi';
+  const defaultByName = new Map(defaultTeamContent.hrMembers.map((member) => [member.name, member]));
+  const savedNames = new Set(members.map((member) => member.name));
+  const normalizedSavedMembers = members
+    .filter((member) => member.name !== 'Weng')
+    .map((member) => ({
+      ...defaultByName.get(member.name),
+      ...member,
+      initials: getMemberInitials(member.name),
+    }));
+  const missingDefaultMembers = defaultTeamContent.hrMembers.filter((member) => !savedNames.has(member.name));
 
-const specialistMantra =
-  '"It is my goal and aspiration to drive continuous learning within Madison 88 by aligning development initiatives with business goals, strengthening systems, and enabling people to perform at their best."';
+  return [...normalizedSavedMembers, ...missingDefaultMembers];
+}
+
+function normalizeTeamContent(content: Partial<TeamContent>): TeamContent {
+  return {
+    ...defaultTeamContent,
+    ...content,
+    heading: {
+      ...defaultTeamContent.heading,
+      ...content.heading,
+    },
+    specialist: {
+      ...defaultTeamContent.specialist,
+      ...content.specialist,
+    },
+    story: {
+      ...defaultTeamContent.story,
+      ...content.story,
+    },
+    hrMembers: normalizeHrMembers(content.hrMembers),
+    contributors: content.contributors || defaultTeamContent.contributors,
+  };
+}
 
 function loadTeamContent() {
   if (typeof window === 'undefined') {
@@ -136,14 +204,14 @@ function loadTeamContent() {
   }
 
   try {
-    return JSON.parse(savedContent) as TeamContent;
+    return normalizeTeamContent(JSON.parse(savedContent) as Partial<TeamContent>);
   } catch {
     return defaultTeamContent;
   }
 }
 
-function saveTeamContent(content: TeamContent) {
-  window.localStorage.setItem(teamStorageKey, JSON.stringify(content));
+async function saveTeamContent(content: TeamContent) {
+  await saveSiteContent(teamStorageKey, content);
 }
 
 function loadAboutPageContent() {
@@ -169,53 +237,26 @@ function loadAboutPageContent() {
   }
 }
 
-function saveAboutPageContent(content: AboutPageContent) {
-  window.localStorage.setItem(aboutPageStorageKey, JSON.stringify(content));
+function normalizeAboutPageContent(content: Partial<AboutPageContent>): AboutPageContent {
+  const defaultOrder = defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+  const savedOrder = content.aboutSectionOrder || [];
+  const aboutSectionOrder = [
+    ...savedOrder.filter((sectionId): sectionId is AboutSectionId => defaultOrder.includes(sectionId as AboutSectionId)),
+    ...defaultOrder.filter((sectionId) => !savedOrder.includes(sectionId)),
+  ];
+
+  return {
+    ...defaultAboutPageContent,
+    ...content,
+    isAboutHidden: Boolean(content.isAboutHidden),
+    isExcellenceHidden: Boolean(content.isExcellenceHidden),
+    aboutSectionOrder,
+    sections: content.sections || [],
+  };
 }
 
-function resizeImageForStorage(file: File) {
-  return new Promise<string>((resolve, reject) => {
-    const image = new Image();
-    const reader = new FileReader();
-
-    reader.onload = () => {
-      if (typeof reader.result !== 'string') {
-        reject(new Error('Unable to read image file.'));
-        return;
-      }
-
-      image.src = reader.result;
-    };
-
-    reader.onerror = () => {
-      reject(new Error('Unable to read image file.'));
-    };
-
-    image.onload = () => {
-      const maxSize = 640;
-      const scale = Math.min(1, maxSize / Math.max(image.width, image.height));
-      const width = Math.round(image.width * scale);
-      const height = Math.round(image.height * scale);
-      const canvas = document.createElement('canvas');
-      const context = canvas.getContext('2d');
-
-      if (!context) {
-        reject(new Error('Unable to prepare image.'));
-        return;
-      }
-
-      canvas.width = width;
-      canvas.height = height;
-      context.drawImage(image, 0, 0, width, height);
-      resolve(canvas.toDataURL('image/jpeg', 0.82));
-    };
-
-    image.onerror = () => {
-      reject(new Error('Unable to load image file.'));
-    };
-
-    reader.readAsDataURL(file);
-  });
+async function saveAboutPageContent(content: AboutPageContent) {
+  await saveSiteContent(aboutPageStorageKey, content);
 }
 
 function getBlankMember(): TeamMember {
@@ -236,6 +277,11 @@ function getBlankAboutSection(): AboutPageSection {
   };
 }
 
+function getMemberInitials(name: string) {
+  const letters = name.replace(/[^a-zA-Z]/g, '').slice(0, 2).toUpperCase();
+  return letters || 'NA';
+}
+
 function renderMemberPhoto(member: TeamMember) {
   return (
     <>
@@ -248,7 +294,7 @@ function renderMemberPhoto(member: TeamMember) {
           }}
         />
       )}
-      <span>{member.initials}</span>
+      <span>{getMemberInitials(member.name)}</span>
     </>
   );
 }
@@ -264,6 +310,33 @@ function AboutUs() {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loginError, setLoginError] = useState('');
   const [saveError, setSaveError] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    let isMounted = true;
+
+    async function loadSharedContent() {
+      const [nextAboutPageContent, nextTeamContent] = await Promise.all([
+        loadSiteContent(aboutPageStorageKey, defaultAboutPageContent, normalizeAboutPageContent),
+        loadSiteContent(teamStorageKey, defaultTeamContent, normalizeTeamContent),
+      ]);
+
+      if (!isMounted) return;
+
+      setAboutPageContent(nextAboutPageContent);
+      setDraftAboutPageContent(nextAboutPageContent);
+      setTeamContent(nextTeamContent);
+      setDraftTeamContent(nextTeamContent);
+    }
+
+    loadSharedContent().catch(() => {
+      setSaveError('Unable to load shared content from Supabase. Showing local/default content.');
+    });
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   const openHrEditor = () => {
     setDraftTeamContent(teamContent);
@@ -287,25 +360,31 @@ function AboutUs() {
     setLoginError('Invalid HR login.');
   };
 
-  const handleTeamSave = () => {
+  const handleTeamSave = async () => {
+    setIsSaving(true);
     try {
-      saveTeamContent(draftTeamContent);
+      await saveTeamContent(draftTeamContent);
       setTeamContent(draftTeamContent);
       setSaveError('');
       setIsAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using smaller photos or fewer large uploads.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
-  const handleAboutPageSave = () => {
+  const handleAboutPageSave = async () => {
+    setIsSaving(true);
     try {
-      saveAboutPageContent(draftAboutPageContent);
+      await saveAboutPageContent(draftAboutPageContent);
       setAboutPageContent(draftAboutPageContent);
       setSaveError('');
       setIsAboutAdminOpen(false);
     } catch {
-      setSaveError('Save failed. Try using a smaller image.');
+      setSaveError('Save failed. Check the Supabase table and security policies.');
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -318,6 +397,13 @@ function AboutUs() {
 
   const deleteAboutImage = () => {
     updateAboutPageContent('aboutImage', '');
+  };
+
+  const toggleBuiltInAboutSection = (field: 'isAboutHidden' | 'isExcellenceHidden', isHidden: boolean) => {
+    setDraftAboutPageContent((content) => ({
+      ...content,
+      [field]: isHidden,
+    }));
   };
 
   const addAboutSection = () => {
@@ -351,6 +437,42 @@ function AboutUs() {
     updateAboutSection(index, 'image', '');
   };
 
+  const moveAboutSection = (fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftAboutPageContent((content) => {
+      if (toIndex >= content.sections.length) return content;
+
+      const nextSections = [...content.sections];
+      const [movedSection] = nextSections.splice(fromIndex, 1);
+      nextSections.splice(toIndex, 0, movedSection);
+
+      return {
+        ...content,
+        sections: nextSections,
+      };
+    });
+  };
+
+  const moveAboutSectionGroup = (sectionId: AboutSectionId, direction: -1 | 1) => {
+    setDraftAboutPageContent((content) => {
+      const currentOrder = content.aboutSectionOrder || defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+      const fromIndex = currentOrder.indexOf(sectionId);
+      const toIndex = fromIndex + direction;
+
+      if (fromIndex < 0 || toIndex < 0 || toIndex >= currentOrder.length) return content;
+
+      const nextOrder = [...currentOrder];
+      const [movedSection] = nextOrder.splice(fromIndex, 1);
+      nextOrder.splice(toIndex, 0, movedSection);
+
+      return {
+        ...content,
+        aboutSectionOrder: nextOrder,
+      };
+    });
+  };
+
   const updateSectionHeading = (field: keyof TeamContent['heading'], value: string) => {
     setDraftTeamContent((content) => ({
       ...content,
@@ -367,6 +489,17 @@ function AboutUs() {
       ...content,
       specialist: {
         ...content.specialist,
+        [field]: value,
+      },
+    }));
+  };
+
+  const updateTeamStory = (field: keyof TeamContent['story'], value: string) => {
+    setDraftTeamContent((content) => ({
+      ...content,
+      story: {
+        ...defaultTeamContent.story,
+        ...content.story,
         [field]: value,
       },
     }));
@@ -400,90 +533,74 @@ function AboutUs() {
     }));
   };
 
+  const deleteTeamMemberImage = (group: 'hrMembers' | 'contributors', index: number) => {
+    updateTeamMember(group, index, 'image', '');
+  };
+
+  const moveTeamMember = (group: 'hrMembers' | 'contributors', fromIndex: number, toIndex: number) => {
+    if (fromIndex === toIndex || toIndex < 0) return;
+
+    setDraftTeamContent((content) => {
+      if (toIndex >= content[group].length) return content;
+
+      const nextMembers = [...content[group]];
+      const [movedMember] = nextMembers.splice(fromIndex, 1);
+      nextMembers.splice(toIndex, 0, movedMember);
+
+      return {
+        ...content,
+        [group]: nextMembers,
+      };
+    });
+  };
+
   const handleImageUpload = async (
     event: ChangeEvent<HTMLInputElement>,
     updateImage: (image: string) => void,
+    folder = 'about',
   ) => {
     const file = event.target.files?.[0];
+    const input = event.currentTarget;
 
     if (!file) {
       return;
     }
 
     try {
-      const resizedImage = await resizeImageForStorage(file);
-      updateImage(resizedImage);
+      const imageUrl = await uploadImageToStorage(file, folder);
+      updateImage(imageUrl);
       setSaveError('');
     } catch {
       setSaveError('Image upload failed. Please try a different image.');
+    } finally {
+      input.value = '';
     }
   };
 
-  return (
-    <div className="home-page">
-      <section className="home-about">
-        <div className="section-inner about-grid">
-          <div className="about-image-card" aria-label="Madison88 learning session">
-            {aboutPageContent.aboutImage && (
-              <img
-                src={aboutPageContent.aboutImage}
-                alt={aboutPageContent.aboutTitle}
-                onError={(event) => {
-                  event.currentTarget.style.display = 'none';
-                }}
-              />
-            )}
-          </div>
+  const visibleAboutSectionOrder =
+    aboutPageContent.aboutSectionOrder || defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
+  const draftAboutSectionOrder =
+    draftAboutPageContent.aboutSectionOrder || defaultAboutPageContent.aboutSectionOrder || ['about', 'excellence', 'additional'];
 
-          <div className="about-copy">
-            <h2
-              onClick={(event) => {
-                if (event.detail === 3) {
-                  openAboutEditor();
-                }
-              }}
-              style={{ cursor: 'default', userSelect: 'none' }}
-            >
-              {aboutPageContent.aboutTitle}
-            </h2>
-            <p>{aboutPageContent.aboutParagraph}</p>
-          </div>
-        </div>
-      </section>
+  const renderAboutContentSection = (sectionId: AboutSectionId) => {
+    if (sectionId === 'about') {
+      if (aboutPageContent.isAboutHidden) return null;
 
-      <section className="excellence-section">
-        <div className="section-inner excellence-content">
-          <h2
-            onClick={(event) => {
-              if (event.detail === 3) {
-                openAboutEditor();
-              }
-            }}
-            style={{ cursor: 'default', userSelect: 'none' }}
-          >
-            {aboutPageContent.excellenceTitle}
-          </h2>
-          <p>{aboutPageContent.excellenceParagraph}</p>
-        </div>
-      </section>
-
-      {aboutPageContent.sections.map((section, index) => (
-        <section
-          className={`about-extra-section${section.image ? '' : ' about-extra-section-no-image'}`}
-          key={`${section.title}-${index}`}
-        >
-          <div className="section-inner about-extra-grid">
-            {section.image && (
-              <div className="about-extra-image-card">
+      return (
+        <section className="home-about" key="about-section">
+          <div className="section-inner about-grid">
+            <div className="about-image-card" aria-label="Madison88 learning session">
+              {aboutPageContent.aboutImage && (
                 <img
-                  src={section.image}
-                  alt={section.title}
+                  src={aboutPageContent.aboutImage}
+                  alt={aboutPageContent.aboutTitle}
                   onError={(event) => {
                     event.currentTarget.style.display = 'none';
                   }}
                 />
-              </div>
-            )}
+              )}
+            </div>
+
             <div className="about-copy">
               <h2
                 onClick={(event) => {
@@ -493,13 +610,75 @@ function AboutUs() {
                 }}
                 style={{ cursor: 'default', userSelect: 'none' }}
               >
-                {section.title}
+                {aboutPageContent.aboutTitle}
               </h2>
-              <p>{section.paragraph}</p>
+              <p>{aboutPageContent.aboutParagraph}</p>
             </div>
           </div>
         </section>
-      ))}
+      );
+    }
+
+    if (sectionId === 'excellence') {
+      if (aboutPageContent.isExcellenceHidden) return null;
+
+      return (
+        <section className="excellence-section" key="excellence-section">
+          <div className="section-inner excellence-content">
+            <h2
+              onClick={(event) => {
+                if (event.detail === 3) {
+                  openAboutEditor();
+                }
+              }}
+              style={{ cursor: 'default', userSelect: 'none' }}
+            >
+              {aboutPageContent.excellenceTitle}
+            </h2>
+            <p>{aboutPageContent.excellenceParagraph}</p>
+          </div>
+        </section>
+      );
+    }
+
+    return aboutPageContent.sections.map((section, index) => (
+      <section
+        className={`about-extra-section${section.image ? '' : ' about-extra-section-no-image'}`}
+        key={`${section.title}-${index}`}
+      >
+        <div className="section-inner about-extra-grid">
+          {section.image && (
+            <div className="about-extra-image-card">
+              <img
+                src={section.image}
+                alt={section.title}
+                onError={(event) => {
+                  event.currentTarget.style.display = 'none';
+                }}
+              />
+            </div>
+          )}
+          <div className="about-copy">
+            <h2
+              onClick={(event) => {
+                if (event.detail === 3) {
+                  openAboutEditor();
+                }
+              }}
+              style={{ cursor: 'default', userSelect: 'none' }}
+            >
+              {section.title}
+            </h2>
+            <p>{section.paragraph}</p>
+          </div>
+        </div>
+      </section>
+    ));
+  };
+
+  return (
+    <div className="home-page">
+      {visibleAboutSectionOrder.map((sectionId) => renderAboutContentSection(sectionId))}
 
       <section className="specialists-section">
         <div className="section-inner">
@@ -538,13 +717,13 @@ function AboutUs() {
               </div>
               <div className="profile-story">
                 <div>
-                  <p>{specialistIntroduction}</p>
+                  <p>{teamContent.story?.introduction || defaultTeamContent.story.introduction}</p>
                 </div>
                 <div>
-                  <p>{specialistQuote}</p>
+                  <p>{teamContent.story?.quote || defaultTeamContent.story.quote}</p>
                 </div>
                 <div>
-                  <p>{specialistMantra}</p>
+                  <p>{teamContent.story?.mantra || defaultTeamContent.story.mantra}</p>
                 </div>
               </div>
               <br />
@@ -552,12 +731,14 @@ function AboutUs() {
                 className="profile-contact"
                 href={`mailto:${teamContent.specialist.email || defaultTeamContent.specialist.email}?subject=Learning%20%26%20Development%20Inquiry`}
               >
-                Contact Me
+                {teamContent.story?.contactLabel || defaultTeamContent.story.contactLabel}
               </a>
             </article>
 
             <article className="specialist-card hr-members-card">
-              <p className="profile-role">HR Members</p>
+              <p className="profile-role">
+                {teamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}
+              </p>
               <div className="hr-member-list">
                 {teamContent.hrMembers.map((member) => (
                   <article className="contributor-profile" key={member.name}>
@@ -575,7 +756,9 @@ function AboutUs() {
             </article>
 
             <article className="specialist-card contributors-card">
-              <p className="profile-role">Contributors</p>
+              <p className="profile-role">
+                {teamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}
+              </p>
               <div className="contributors-list">
                 {teamContent.contributors.map((contributor) => (
                   <article className="contributor-profile" key={contributor.name}>
@@ -646,7 +829,38 @@ function AboutUs() {
             ) : (
               <div className="hr-admin-editor">
                 <section className="hr-admin-editor-section">
-                  <h3>About Section</h3>
+                  <div className="hr-admin-section-heading">
+                    <div className="hr-admin-heading-group">
+                      <h3>About Section</h3>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder About section">
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('about', -1)}
+                          disabled={draftAboutSectionOrder.indexOf('about') === 0}
+                          aria-label="Move About section up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('about', 1)}
+                          disabled={draftAboutSectionOrder.indexOf('about') === draftAboutSectionOrder.length - 1}
+                          aria-label="Move About section down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      className={draftAboutPageContent.isAboutHidden ? 'hr-admin-small-action' : 'hr-admin-delete'}
+                      type="button"
+                      onClick={() => {
+                        toggleBuiltInAboutSection('isAboutHidden', !draftAboutPageContent.isAboutHidden);
+                      }}
+                    >
+                      {draftAboutPageContent.isAboutHidden ? 'Restore Section' : 'Delete Section'}
+                    </button>
+                  </div>
                   <div className="hr-admin-grid">
                     <label>
                       Title
@@ -681,12 +895,15 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateAboutPageContent('aboutImage', image);
-                            });
+                            }, 'about/main');
                           }}
                         />
                         <label className="hr-admin-file-button" htmlFor="about-page-image-upload">
                           Choose File
                         </label>
+                        <button className="hr-admin-delete" type="button" onClick={deleteAboutImage}>
+                          Delete Image
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -700,13 +917,41 @@ function AboutUs() {
                       }}
                     />
                   </label>
-                  <button className="hr-admin-delete" type="button" onClick={deleteAboutImage}>
-                    Delete Image
-                  </button>
                 </section>
 
                 <section className="hr-admin-editor-section">
-                  <h3>Center for Excellence Section</h3>
+                  <div className="hr-admin-section-heading">
+                    <div className="hr-admin-heading-group">
+                      <h3>Center for Excellence Section</h3>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder Center for Excellence section">
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('excellence', -1)}
+                          disabled={draftAboutSectionOrder.indexOf('excellence') === 0}
+                          aria-label="Move Center for Excellence section up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('excellence', 1)}
+                          disabled={draftAboutSectionOrder.indexOf('excellence') === draftAboutSectionOrder.length - 1}
+                          aria-label="Move Center for Excellence section down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
+                    <button
+                      className={draftAboutPageContent.isExcellenceHidden ? 'hr-admin-small-action' : 'hr-admin-delete'}
+                      type="button"
+                      onClick={() => {
+                        toggleBuiltInAboutSection('isExcellenceHidden', !draftAboutPageContent.isExcellenceHidden);
+                      }}
+                    >
+                      {draftAboutPageContent.isExcellenceHidden ? 'Restore Section' : 'Delete Section'}
+                    </button>
+                  </div>
                   <label>
                     Title
                     <input
@@ -731,7 +976,27 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>Additional Sections</h3>
+                    <div className="hr-admin-heading-group">
+                      <h3>Additional Sections</h3>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder additional sections group">
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('additional', -1)}
+                          disabled={draftAboutSectionOrder.indexOf('additional') === 0}
+                          aria-label="Move Additional Sections up"
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveAboutSectionGroup('additional', 1)}
+                          disabled={draftAboutSectionOrder.indexOf('additional') === draftAboutSectionOrder.length - 1}
+                          aria-label="Move Additional Sections down"
+                        >
+                          ▼
+                        </button>
+                      </div>
+                    </div>
                     <button className="hr-admin-small-action" type="button" onClick={addAboutSection}>
                       Add Section
                     </button>
@@ -755,6 +1020,24 @@ function AboutUs() {
                         </div>
 
                         <div className="featured-course-admin-fields">
+                          <div className="hr-admin-reorder-controls" aria-label="Reorder about section">
+                            <button
+                              type="button"
+                              onClick={() => moveAboutSection(index, index - 1)}
+                              disabled={index === 0}
+                              aria-label={`Move ${section.title} up`}
+                            >
+                              ▲
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => moveAboutSection(index, index + 1)}
+                              disabled={index === draftAboutPageContent.sections.length - 1}
+                              aria-label={`Move ${section.title} down`}
+                            >
+                              ▼
+                            </button>
+                          </div>
                           <label>
                             Title
                             <input
@@ -787,7 +1070,7 @@ function AboutUs() {
                                 onChange={(event) => {
                                   handleImageUpload(event, (image) => {
                                     updateAboutSection(index, 'image', image);
-                                  });
+                                  }, 'about/sections');
                                 }}
                               />
                               <span className="hr-admin-file-button">Choose File</span>
@@ -828,8 +1111,8 @@ function AboutUs() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleAboutPageSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleAboutPageSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
@@ -977,7 +1260,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateSpecialist('image', image);
-                            });
+                            }, 'about/team');
                           }}
                         />
                         <label
@@ -986,16 +1269,81 @@ function AboutUs() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            updateSpecialist('image', '');
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                     </div>
                   </div>
+                </section>
+
+                <section className="hr-admin-editor-section">
+                  <h3>Profile Story</h3>
+                  <div className="hr-admin-grid">
+                    <label>
+                      Contact Button Text
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.contactLabel || defaultTeamContent.story.contactLabel}
+                        onChange={(event) => {
+                          updateTeamStory('contactLabel', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      HR Members Heading
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}
+                        onChange={(event) => {
+                          updateTeamStory('hrMembersTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                    <label>
+                      Contributors Heading
+                      <input
+                        maxLength={teamFieldLimits.groupTitle}
+                        value={draftTeamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}
+                        onChange={(event) => {
+                          updateTeamStory('contributorsTitle', event.target.value);
+                        }}
+                      />
+                    </label>
+                  </div>
                   <label>
-                    Bio
+                    Introduction
                     <textarea
-                      maxLength={teamFieldLimits.specialistBio}
-                      value={draftTeamContent.specialist.bio}
+                      maxLength={teamFieldLimits.storyText}
+                      value={draftTeamContent.story?.introduction || defaultTeamContent.story.introduction}
                       onChange={(event) => {
-                        updateSpecialist('bio', event.target.value);
+                        updateTeamStory('introduction', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Quote
+                    <textarea
+                      maxLength={teamFieldLimits.storyQuote}
+                      value={draftTeamContent.story?.quote || defaultTeamContent.story.quote}
+                      onChange={(event) => {
+                        updateTeamStory('quote', event.target.value);
+                      }}
+                    />
+                  </label>
+                  <label>
+                    Goal / Mantra
+                    <textarea
+                      maxLength={teamFieldLimits.storyText}
+                      value={draftTeamContent.story?.mantra || defaultTeamContent.story.mantra}
+                      onChange={(event) => {
+                        updateTeamStory('mantra', event.target.value);
                       }}
                     />
                   </label>
@@ -1003,7 +1351,7 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>HR Members</h3>
+                    <h3>{draftTeamContent.story?.hrMembersTitle || defaultTeamContent.story.hrMembersTitle}</h3>
                     <button
                       className="hr-admin-small-action"
                       type="button"
@@ -1023,6 +1371,24 @@ function AboutUs() {
                   </div>
                   {draftTeamContent.hrMembers.map((member, index) => (
                     <div className="hr-admin-member-row" key={`about-hr-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder HR member">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('hrMembers', index, index + 1)}
+                          disabled={index === draftTeamContent.hrMembers.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">{renderMemberPhoto(member)}</div>
                         <input
@@ -1034,7 +1400,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('hrMembers', index, 'image', image);
-                            });
+                            }, 'about/hr-members');
                           }}
                         />
                         <label
@@ -1043,6 +1409,15 @@ function AboutUs() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            deleteTeamMemberImage('hrMembers', index);
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                       <input
                         aria-label="HR member title"
@@ -1083,7 +1458,7 @@ function AboutUs() {
 
                 <section className="hr-admin-editor-section">
                   <div className="hr-admin-section-heading">
-                    <h3>Contributors</h3>
+                    <h3>{draftTeamContent.story?.contributorsTitle || defaultTeamContent.story.contributorsTitle}</h3>
                     <button
                       className="hr-admin-small-action"
                       type="button"
@@ -1103,6 +1478,24 @@ function AboutUs() {
                   </div>
                   {draftTeamContent.contributors.map((member, index) => (
                     <div className="hr-admin-member-row" key={`about-contributor-${index}`}>
+                      <div className="hr-admin-reorder-controls" aria-label="Reorder contributor">
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index - 1)}
+                          disabled={index === 0}
+                          aria-label={`Move ${member.name} up`}
+                        >
+                          ▲
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => moveTeamMember('contributors', index, index + 1)}
+                          disabled={index === draftTeamContent.contributors.length - 1}
+                          aria-label={`Move ${member.name} down`}
+                        >
+                          ▼
+                        </button>
+                      </div>
                       <div className="hr-admin-photo-editor">
                         <div className="hr-admin-photo-preview">{renderMemberPhoto(member)}</div>
                         <input
@@ -1114,7 +1507,7 @@ function AboutUs() {
                           onChange={(event) => {
                             handleImageUpload(event, (image) => {
                               updateTeamMember('contributors', index, 'image', image);
-                            });
+                            }, 'about/contributors');
                           }}
                         />
                         <label
@@ -1123,6 +1516,15 @@ function AboutUs() {
                         >
                           Choose File
                         </label>
+                        <button
+                          className="hr-admin-delete"
+                          type="button"
+                          onClick={() => {
+                            deleteTeamMemberImage('contributors', index);
+                          }}
+                        >
+                          Delete Image
+                        </button>
                       </div>
                       <input
                         aria-label="Contributor title"
@@ -1172,8 +1574,8 @@ function AboutUs() {
                   >
                     Cancel
                   </button>
-                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave}>
-                    Save Changes
+                  <button className="hr-admin-primary" type="button" onClick={handleTeamSave} disabled={isSaving}>
+                    {isSaving ? 'Saving...' : 'Save Changes'}
                   </button>
                 </div>
               </div>
