@@ -982,7 +982,10 @@ function Home() {
               style={{ cursor: 'default', userSelect: 'none' }}
             >
               <span>{featuredCoursesContent.leftTitle}</span>
-              <span>{featuredCoursesContent.centerText}</span>
+              <svg className="featured-courses-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <line x1="12" y1="5" x2="12" y2="19" />
+                <line x1="5" y1="12" x2="19" y2="12" />
+              </svg>
               <span>
                 {featuredCoursesContent.rightLineOne}
                 <span>{featuredCoursesContent.rightLineTwo}</span>
@@ -998,14 +1001,14 @@ function Home() {
               <div className="featured-course-column-list">
                 {featuredCoursesContent.cards
                   .filter((card) => card.column === 'copilot')
-                  .map((card, index) => renderFeaturedCourseCard(card, `copilot-${index}`))}
+                  .map((card, index) => renderFeaturedCourseCard(card, index))}
               </div>
             </div>
             <div className="featured-course-column">
               <div className="featured-course-column-list">
                 {featuredCoursesContent.cards
                   .filter((card) => card.column === 'outlook')
-                  .map((card, index) => renderFeaturedCourseCard(card, `outlook-${index}`))}
+                  .map((card, index) => renderFeaturedCourseCard(card, index))}
               </div>
             </div>
           </div>
