@@ -972,9 +972,8 @@ function Home() {
 
       <section className="careers-section">
         <div className="section-inner featured-courses-content">
-          <div className="careers-copy"><br></br>
-            <p className="section-kicker">{featuredCoursesContent.kicker}</p><br>
-</br><br></br><br></br><br></br>
+          <div className="careers-copy">
+            <p className="section-kicker">{featuredCoursesContent.kicker}</p>
             <h2
               className="featured-courses-title"
               onClick={(event) => {
@@ -990,12 +989,25 @@ function Home() {
               </span>
             </h2>
           </div>
-          <div className="featured-course-board">
-            <div className="featured-phase-heading">
-              <span>{featuredCoursesContent.phaseKicker}</span>
-              <h3>{featuredCoursesContent.phaseTitle}</h3>
+          <div className="featured-phase-heading">
+            <span>{featuredCoursesContent.phaseKicker}</span>
+            <h3>{featuredCoursesContent.phaseTitle}</h3>
+          </div>
+          <div className="featured-course-columns">
+            <div className="featured-course-column">
+              <div className="featured-course-column-list">
+                {featuredCoursesContent.cards
+                  .filter((card) => card.column === 'copilot')
+                  .map((card, index) => renderFeaturedCourseCard(card, `copilot-${index}`))}
+              </div>
             </div>
-            {featuredCoursesContent.cards.map((card, index) => renderFeaturedCourseCard(card, index))}
+            <div className="featured-course-column">
+              <div className="featured-course-column-list">
+                {featuredCoursesContent.cards
+                  .filter((card) => card.column === 'outlook')
+                  .map((card, index) => renderFeaturedCourseCard(card, `outlook-${index}`))}
+              </div>
+            </div>
           </div>
         </div>
       </section>
